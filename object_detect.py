@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # Video Input
-cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\sample_footage1.mp4")
+cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\sample_footage2.mp4")
 
 
 ret, prev_frame = cap.read()
@@ -23,7 +23,7 @@ fgbg = cv2.createBackgroundSubtractorMOG2(
 )
 
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-MIN_AREA = 150
+MIN_AREA = 500
 
 
 # 3. Feature Detection (for stabilization)
@@ -74,10 +74,9 @@ while True:
     prev_gray = gray.copy()
     prev_pts = cv2.goodFeaturesToTrack(prev_gray, mask=None, **feature_params)
 
-    # ----------------------------
     # MOTION DETECTION (on stabilized frame)
-    # ----------------------------
     raw_mask = fgbg.apply(stabilized)
+
 
     clean_mask = cv2.morphologyEx(raw_mask, cv2.MORPH_OPEN, kernel)
     clean_mask = cv2.morphologyEx(clean_mask, cv2.MORPH_CLOSE, kernel)
@@ -130,7 +129,7 @@ while True:
     cv2.imshow("Foreground Mask", clean_mask)
     cv2.imshow("Final Detection", display)
 
-    if cv2.waitKey(30) & 0xFF == 27:
+    if cv2.waitKey(50) & 0xFF == 27:
         break
 
 cap.release()
