@@ -4,7 +4,6 @@ import numpy as np
 # Video Input
 cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\sample_footage2.mp4")
 
-
 ret, prev_frame = cap.read()
 if not ret:
     print("Error reading video")
@@ -121,15 +120,13 @@ while True:
             print(f"Object center at: ({cx}, {cy})")
 
 
-    # ----------------------------
     # DISPLAY
-    # ----------------------------
     cv2.imshow("Original (Shaky)", frame)
     cv2.imshow("Stabilized Frame", stabilized)
     cv2.imshow("Foreground Mask", clean_mask)
     cv2.imshow("Final Detection", display)
 
-    if cv2.waitKey(50) & 0xFF == 27:
+    if cv2.waitKey(0) & 0xFF == ord('q'):
         break
 
 cap.release()
