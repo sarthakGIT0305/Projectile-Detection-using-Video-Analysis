@@ -22,10 +22,10 @@ fgbg = cv2.createBackgroundSubtractorMOG2(
 )
 
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-MIN_AREA = 500
+MIN_AREA = 400
 
 
-# 3. Feature Detection (for stabilization)
+# Feature Detection (for stabilization)
 feature_params = dict(
     maxCorners=200,
     qualityLevel=0.01,
