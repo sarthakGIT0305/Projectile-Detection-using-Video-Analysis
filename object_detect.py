@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
 
-# Video Input
-cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\sample_footage2.mp4")
+# Video Inputq
+cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\sample_footage4.mp4")
 
 ret, prev_frame = cap.read()
 if not ret:
@@ -21,7 +21,7 @@ fgbg = cv2.createBackgroundSubtractorMOG2(
     detectShadows=False
 )
 
-kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 MIN_AREA = 400
 
 
