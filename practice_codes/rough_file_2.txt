@@ -1,0 +1,9 @@
+
+algos to learn 
+
+- convertion to greyscale
+- background subtractor mog2
+- morphological kernel
+- frame differencing
+- contours
+- multiframe validation
