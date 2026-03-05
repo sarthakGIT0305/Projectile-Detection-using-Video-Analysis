@@ -3,6 +3,8 @@ import numpy as np
 
 # Video Inputq
 cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\sample_footage4.mp4")
+# Video Inputq
+cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\sample_footage4.mp4")
 
 ret, prev_frame = cap.read()
 if not ret:
@@ -131,3 +133,4 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+ 

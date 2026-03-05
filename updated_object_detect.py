@@ -17,7 +17,7 @@ USE_MULTI_FRAME_VALIDATION = True
 # VIDEO INPUT
 # ==============================
 
-cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\distance_3.mp4")
+cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\distance_4.mp4")
 
 if not cap.isOpened():
     print("Error opening video")
@@ -35,7 +35,7 @@ height, width = prev_frame.shape[:2]
 # ROI SETTINGS (only upper region)
 # ==============================
 
-Percent_of_height = 1 # starting from top of the video
+Percent_of_height = 0.7 # starting from top of the video
 wall_line = int(height * Percent_of_height) 
 
 # ==============================
@@ -44,23 +44,19 @@ wall_line = int(height * Percent_of_height)
 
 fgbg = cv2.createBackgroundSubtractorMOG2(
     history=300,
-    varThreshold=30, # lower value -> more sensitive
+    varThreshold=20, # lower value -> more sensitive
     detectShadows=False
 )
 
-# ==============================
-# MORPHOLOGY KERNEL
-# ==============================
-
-kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 
 # ==============================
 # FILTER PARAMETERS
 # ==============================
 
-MIN_AREA = 1
+MIN_AREA = 0
 MAX_AREA = 80000
-MOTION_THRESHOLD = 5
+MOTION_THRESHOLD = 3
 VALIDATION_FRAMES = 5
 
 trajectory = deque(maxlen=20)
@@ -246,7 +242,7 @@ while True:
         validation_counter += 1
     else:
         validation_counter = 0
-
+ 
 
     # Update previous frame
     prev_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -261,7 +257,7 @@ while True:
     cv2.imshow("Detection", display_frame)
     cv2.imshow("Mask", display_mask)
 
-    if cv2.waitKey(20) & 0xFF == ord('q'):
+    if cv2.waitKey(10) & 0xFF == ord('q'):
         break
 
 cap.release()
