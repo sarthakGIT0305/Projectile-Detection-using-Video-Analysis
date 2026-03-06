@@ -17,7 +17,7 @@ USE_MULTI_FRAME_VALIDATION = True
 # VIDEO INPUT
 # ==============================
 
-cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\distance_4.mp4")
+cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\50m-1.mp4")
 
 if not cap.isOpened():
     print("Error opening video")
