@@ -11,7 +11,7 @@ from collections import deque
 USE_ROI = True
 USE_FRAME_DIFF = True
 USE_MOG2 = True
-USE_MASK_COMBINATION = True
+USE_MASK_COMBINATION = True 
 USE_SPEED_FILTER = True
 USE_MULTI_FRAME_VALIDATION = True
 

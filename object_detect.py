@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 
 # Video Inputq
-cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\sample_footage4.mp4")
+cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\distance_2.mp4")
 # Video Inputq
-cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\sample_footage4.mp4")
+# cap = cv2.VideoCapture(r"D:\\Coding++\\web_dev_and_projects\\open_cv\\assets\\sample_footage4.mp4")
 
 ret, prev_frame = cap.read()
 if not ret:
@@ -19,7 +19,7 @@ prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
 # Background Subtractor
 fgbg = cv2.createBackgroundSubtractorMOG2(
     history=300,
-    varThreshold=50,
+    varThreshold=50, 
     detectShadows=False
 )
 
@@ -128,7 +128,7 @@ while True:
     cv2.imshow("Foreground Mask", clean_mask)
     cv2.imshow("Final Detection", display)
 
-    if cv2.waitKey(0) & 0xFF == ord('q'):
+    if cv2.waitKey(10) & 0xFF == ord('q'):
         break
 
 cap.release()

@@ -1,9 +1,282 @@
+You can copy‑paste this directly into your local agent.
+Prompt for Local LLM Coding Agent
 
-algos to learn 
+You are a senior computer vision engineer helping build a modular OpenCV project.
 
-- convertion to greyscale
-- background subtractor mog2
-- morphological kernel
-- frame differencing
-- contours
-- multiframe validation
+Your task is to generate a clean, modular Python project for detecting and tracking a very small fast-moving object (tennis-ball sized) in a video.
+
+The video characteristics are:
+
+    Static camera
+
+    People walking in background
+
+    Birds flying
+
+    Trees moving slightly
+
+    Complex background (trees + buildings)
+
+    The tennis ball is extremely small, sometimes barely visible
+
+    Multiple moving objects exist in the scene
+
+The objective is to:
+
+    Detect the tiny moving object
+
+    Track it across frames
+
+    Track multiple moving objects simultaneously
+
+    Keep the code modular and maintainable
+
+    Later classify whether the motion follows a parabolic trajectory
+
+The current stage focuses only on:
+
+Detection + Multi-object tracking
+
+Trajectory classification will be added later.
+Project Requirements
+
+Generate a modular Python OpenCV project with separate files for each pipeline stage.
+
+The code must be:
+
+    clean
+
+    modular
+
+    well commented
+
+    easy to modify
+
+    easy to test stage by stage
+
+Avoid putting everything into one file.
+Required Project Structure
+
+Create the following structure:
+
+project_root/
+
+main.py
+config.py
+
+video/
+    video_reader.py
+
+preprocessing/
+    grayscale.py
+    roi.py
+
+motion/
+    frame_diff.py
+    background_subtraction.py
+    mask_processing.py
+
+detection/
+    contour_detector.py
+    blob_filter.py
+
+tracking/
+    multi_object_tracker.py
+
+utils/
+    drawing.py
+
+Each module must implement only one responsibility.
+Pipeline Architecture
+
+The main pipeline should work as follows:
+
+Video Input
+↓
+ROI restriction
+↓
+Grayscale conversion
+↓
+Frame differencing
+↓
+Background subtraction (MOG2)
+↓
+Combine motion masks
+↓
+Morphological cleaning
+↓
+Contour detection
+↓
+Blob filtering (area constraints)
+↓
+Multi-object tracking
+↓
+Draw results
+
+Important Design Constraints
+1. Tiny object detection
+
+The object is extremely small.
+
+The system must be able to detect blobs as small as a few pixels.
+
+Filtering thresholds must be configurable.
+2. Multiple objects
+
+The tracker must support:
+
+    multiple moving objects
+
+    assigning consistent IDs
+
+    tracking across frames
+
+Use a centroid distance based tracker.
+3. Configurable parameters
+
+All parameters must be placed in config.py, including:
+
+    video path
+
+    ROI percentage
+
+    frame difference threshold
+
+    MOG2 parameters
+
+    morphology kernel size
+
+    blob min/max area
+
+    tracker max distance
+
+    display scaling
+
+No hardcoded values inside algorithms.
+4. Modular architecture
+
+Each module must expose simple functions or classes.
+
+Examples:
+
+to_gray(frame)
+
+apply_roi(frame, percent)
+
+frame_difference(prev_gray, gray, threshold)
+
+BackgroundSubtractor.apply(frame)
+
+clean_mask(mask)
+
+detect_contours(mask)
+
+filter_blobs(contours)
+
+Tracker.update(detections)
+
+draw_objects(frame, objects)
+
+Detection Logic
+
+Blob filtering must compute:
+
+area
+bounding box
+centroid
+
+Return structured detection objects like:
+
+{
+    "bbox": (x, y, w, h),
+    "center": (cx, cy),
+    "area": area
+}
+
+Tracking Logic
+
+Implement a centroid-based multi-object tracker.
+
+Features:
+
+    assign unique IDs
+
+    match detections to existing objects using distance
+
+    create new objects when unmatched
+
+    remove objects if not detected for several frames
+
+Mask Processing
+
+Use morphological operations:
+
+opening
+closing
+dilation
+
+to remove noise and connect object pixels.
+Visualization
+
+Draw:
+
+    bounding boxes
+
+    object IDs
+
+    object centers
+
+Also display:
+
+clean mask window
+detection window
+
+Coding Requirements
+
+All code must include:
+
+    comments explaining what each function does
+
+    readable variable names
+
+    separation of logic across modules
+
+Avoid large monolithic functions.
+main.py Responsibilities
+
+The main file should:
+
+    load configuration
+
+    initialize modules
+
+    run the processing loop
+
+    combine all pipeline stages
+
+    display results
+
+The pipeline must clearly follow the architecture described above.
+Future Extension (Do NOT implement yet)
+
+The architecture should allow adding later:
+
+trajectory_analysis/
+    parabolic_detector.py
+
+which will analyze object tracks and detect parabolic motion.
+Deliverables
+
+Generate:
+
+    All project files
+
+    Full code for each file
+
+    Clean imports between modules
+
+    Ready-to-run Python code
+
+The output should clearly show the contents of each file.
+
+If possible, optimize the system for detecting extremely small moving objects in noisy backgrounds.
