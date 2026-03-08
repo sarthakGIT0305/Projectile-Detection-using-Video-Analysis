@@ -1,9 +1,4 @@
-"""Main entry point for the tiny object detection pipeline.
-
-The script demonstrates how the modular components are assembled and
-executed frame‑by‑frame.  The pipeline is deliberately simple so that it
-can be run as a script or imported into a larger application.
-"""
+"""Main entry point for the tiny object detection pipeline."""
 
 import cv2
 import time
@@ -76,7 +71,7 @@ def main():
 
         # 2. Grayscale conversion
         gray = to_gray(frame_roi)
-
+ 
         # 3. Frame differencing
         if prev_gray is None:
             prev_gray = gray
@@ -116,7 +111,7 @@ def main():
             resized_frame = output_frame
 
         cv2.imshow("Detected objects", resized_frame)
-        key = cv2.waitKey(1) & 0xFF
+        key = cv2.waitKey(50) & 0xFF
         if key == 27 or key == ord('q'):  # ESC or 'q'
             break
 

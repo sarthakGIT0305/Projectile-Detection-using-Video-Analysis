@@ -1,16 +1,10 @@
 # config.py
-"""Configuration parameters for the tiny object detection pipeline.
-
-All parameters are defined here so that the algorithms can be tuned without
-changing code.  The values below are reasonable defaults for a typical
-small, fast‑moving ball in a static‑camera scene, but can be overridden by
-changing the constants in this file.
-"""
+"""Configuration parameters for the tiny object detection pipeline"""
 
 import cv2
 
 # Path to the video file
-VIDEO_PATH = "D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\sample_footage3.mp4"
+VIDEO_PATH = "D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\50m-1.mp4"
 
 # Percentage of the frame to keep when applying ROI (relative to width and height)
 # 1.0 means use the whole frame.
@@ -18,10 +12,10 @@ ROI_PERCENT = 1.0
 
 # Frame difference threshold.  Pixels with intensity change above this
 # value are considered part of motion.
-FRAME_DIFF_THRESHOLD = 30
+FRAME_DIFF_THRESHOLD = 1
 
 # MOG2 background subtractor parameters
-MOG2_HISTORY = 500
+MOG2_HISTORY = 300
 MOG2_VAR_THRESHOLD = 16
 MOG2_DETECT_SHADOWS = False
 

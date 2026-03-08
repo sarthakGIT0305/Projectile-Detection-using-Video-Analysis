@@ -1,5 +1,4 @@
 """Blob filtering helper.
-
 Filters contours based on area and extracts bounding box and centroid.
 """
 
