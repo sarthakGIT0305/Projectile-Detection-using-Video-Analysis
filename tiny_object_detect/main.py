@@ -111,7 +111,7 @@ def main():
             resized_frame = output_frame
 
         cv2.imshow("Detected objects", resized_frame)
-        key = cv2.waitKey(50) & 0xFF
+        key = cv2.waitKey(10) & 0xFF
         if key == 27 or key == ord('q'):  # ESC or 'q'
             break
 

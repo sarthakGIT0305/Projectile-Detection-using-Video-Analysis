@@ -1,8 +1,4 @@
-"""Simple video reader wrapper.
-
-Provides a thin abstraction over cv2.VideoCapture so that the rest of the
-pipeline can obtain frames and the underlying capture object.
-"""
+"""Simple video reader wrapper"""
 
 import cv2
 
