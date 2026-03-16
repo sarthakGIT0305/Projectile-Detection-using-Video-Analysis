@@ -11,7 +11,7 @@ import cv2
 # -----------------------------------------------------------------------------
 # VIDEO
 # -----------------------------------------------------------------------------
-VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\50m-2.mp4" 
+VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\distance_3.mp4" 
 
 # -----------------------------------------------------------------------------
 # FEATURE FLAGS
@@ -37,7 +37,7 @@ ENABLE_DEBUG_VIEW   = True   # show intermediate mask windows while running
 # Fraction of the frame to keep, centered.
 # 1.0 = full frame.  0.6 = keep central 60% of width and height.
 # Only reduce this when you know the ball stays in a specific zone.
-ROI_PERCENT = 0.7
+ROI_PERCENT = 1
 ROI_ANCHOR_X = 0.5
 ROI_ANCHOR_Y = 0.5
 
@@ -66,15 +66,15 @@ CLAHE_TILE_GRID  = (8, 8)
 # tophat.py — run both directions
 TOPHAT_MODE = "both"          # was "blackhat" — now handles all backgrounds
 
-TOPHAT_KERNEL_SIZE = (17, 17) # works for sky AND textured backgrounds
-TOPHAT_THRESHOLD   = 12       # moderate — not too sensitive for textured bg
+TOPHAT_KERNEL_SIZE = (1, 11) # works for sky AND textured backgrounds
+TOPHAT_THRESHOLD   = 18       # moderate — not too sensitive for textured bg
 
 # Frame diff — needs to work across all backgrounds
 FRAME_DIFF_GAP       = 2
 FRAME_DIFF_THRESHOLD = 15     # middle ground between sky (8) and textured (20)
 
 # MOG2 — compromise history
-MOG2_HISTORY        = 300
+MOG2_HISTORY        = 100
 MOG2_VAR_THRESHOLD  = 18
 
 # Blob filter — stay loose on shape, strict on size + trajectory
@@ -148,12 +148,12 @@ MORPH_KERNEL_SIZE = (2, 2)
 # -----------------------------------------------------------------------------
 # Area bounds in pixels².
 # At 50 m: ball ≈ 4–16 px².  Raise MIN if noise dots still appear.
-MIN_BLOB_AREA = 4
-MAX_BLOB_AREA = 500
+MIN_BLOB_AREA = 5
+MAX_BLOB_AREA = 100
 
 # Circularity = 4π·area / perimeter²   (perfect circle = 1.0)
 # Tennis ball: ~0.7–1.0.   Clothes / railings: ~0.1–0.4.
-MIN_CIRCULARITY = 0.45
+MIN_CIRCULARITY = 0
 
 # Solidity = contour_area / convex_hull_area   (perfect convex shape = 1.0)
 # Ball: ~0.8–1.0.   Fabric folds (concave): ~0.3–0.6.

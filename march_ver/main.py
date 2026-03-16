@@ -273,7 +273,7 @@ def main():
         mg_mask = bgs.apply(roi_frame) if ENABLE_BG_SUB else None
 
         # ── Stage 6: Combine masks ────────────────────────────────────
-        if th_mask is None and df_mask is None and mg_mask is None:
+        if th_mask is None and df_mask is None and mg_mask is None: 
             # All motion stages disabled — can't continue
             continue
 
@@ -397,7 +397,7 @@ def main():
         # When paused, hold until space or q
         if paused:
             while True:
-                k2 = cv2.waitKey(10) & 0xFF
+                k2 = cv2.waitKey(0) & 0xFF
                 if k2 == ord(" "):
                     paused = False
                     break
