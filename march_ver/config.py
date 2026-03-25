@@ -6,12 +6,12 @@
 # To tune a parameter:    change the value here — no other file needs editing.
 # =============================================================================
 
-import cv2
+import cv2 
 
 # -----------------------------------------------------------------------------
 # VIDEO
 # -----------------------------------------------------------------------------
-VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\distance_3.mp4" 
+VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\vid2.mp4" 
 
 # -----------------------------------------------------------------------------
 # FEATURE FLAGS
@@ -19,17 +19,32 @@ VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\
 # Start with all True, then turn flags off one by one to understand
 # each stage's individual contribution to the final result.
 # -----------------------------------------------------------------------------
-ENABLE_ROI          = True   # crop frame to a sub-region before processing
-ENABLE_CLAHE        = True   # CLAHE contrast boost before motion detection
+ENABLE_ROI          = False   # crop frame to a sub-region before processing
+ENABLE_CLAHE        = True  # CLAHE contrast boost before motion detection
 ENABLE_TOPHAT       = True   # top-hat spatial filter  (key for tiny objects)
 ENABLE_FRAME_DIFF   = True   # 3-frame temporal difference
-ENABLE_BG_SUB       = True   # MOG2 background subtraction
+ENABLE_BG_SUB       = True  # MOG2 background subtraction
 ENABLE_MORPH_CLEAN  = True   # morphological denoising of combined mask
 ENABLE_BLOB_FILTER  = True   # area / circularity / solidity blob filter
-ENABLE_TRAJECTORY   = False  # parabolic trajectory validation (Phase 4)
+ENABLE_TRAJECTORY   = True   # parabolic trajectory validation
 ENABLE_KALMAN       = True   # Kalman-filter tracker
 ENABLE_TRAIL        = True   # draw rolling trajectory trail behind object
+ENABLE_CLASSIFIER   = True  # track classifier — suppress noise, show only projectiles
 ENABLE_DEBUG_VIEW   = True   # show intermediate mask windows while running
+
+# -----------------------------------------------------------------------------
+# PERFORMANCE
+# -----------------------------------------------------------------------------
+# PROCESS_SCALE — resize factor BEFORE all CV processing.
+#   1.0  = full resolution (slowest, most accurate)
+#   0.5  = half resolution (4× fewer pixels, ~3–4× faster)
+#   0.25 = quarter resolution (very fast, may lose tiny balls)
+PROCESS_SCALE = 0.5
+
+# FRAME_SKIP — process every Nth frame (1 = every frame, 2 = every other, etc.)
+#   Higher values = faster but choppier; ball may jump between detections.
+#   At 30fps: skip=2 gives effective 15fps processing, skip=3 gives 10fps.
+FRAME_SKIP = 1
 
 # -----------------------------------------------------------------------------
 # ROI  (preprocessing/roi.py)
@@ -46,8 +61,8 @@ ROI_ANCHOR_Y = 0.5
 # -----------------------------------------------------------------------------
 # clipLimit    — higher = stronger local contrast boost.  Range: 1.0 – 5.0
 # tileGridSize — smaller tiles = more localised enhancement
-CLAHE_CLIP_LIMIT = 3.0
-CLAHE_TILE_GRID  = (8, 8)
+CLAHE_CLIP_LIMIT = 2.0
+CLAHE_TILE_GRID  = (3, 3)
 
 # -----------------------------------------------------------------------------
 # TOP-HAT FILTER  (motion/tophat.py)
@@ -63,33 +78,9 @@ CLAHE_TILE_GRID  = (8, 8)
 #   Background still leaks through → grow kernel (try 19, then 23)
 #   Too many detections → raise TOPHAT_THRESHOLD
 #   Ball not detected → lower TOPHAT_THRESHOLD
-# tophat.py — run both directions
-TOPHAT_MODE = "both"          # was "blackhat" — now handles all backgrounds
-
-TOPHAT_KERNEL_SIZE = (1, 11) # works for sky AND textured backgrounds
-TOPHAT_THRESHOLD   = 18       # moderate — not too sensitive for textured bg
-
-# Frame diff — needs to work across all backgrounds
-FRAME_DIFF_GAP       = 2
-FRAME_DIFF_THRESHOLD = 15     # middle ground between sky (8) and textured (20)
-
-# MOG2 — compromise history
-MOG2_HISTORY        = 100
-MOG2_VAR_THRESHOLD  = 18
-
-# Blob filter — stay loose on shape, strict on size + trajectory
-MIN_CIRCULARITY  = 0.25       # blurred ball won't be circular
-MIN_SOLIDITY     = 0.45       # textured background blobs are very irregular
-MAX_ASPECT_RATIO = 4.5        # motion blur can elongate significantly
-
-# THE MOST IMPORTANT FILTER for multi-background footage:
-# Trajectory validation becomes non-optional
-ENABLE_TRAJECTORY  = True     # was False — now essential
-TRAJECTORY_MIN_POINTS   = 5   # need 5 consistent positions
-TRAJECTORY_MAX_RESIDUAL = 10.0 # pixels — parabola fit tolerance
-
-# Mask combine — motion-first approach
-MASK_COMBINE_MODE = "motion_primary"
+TOPHAT_MODE = "both"          # run both white-hat and black-hat
+TOPHAT_KERNEL_SIZE = (1, 11)  # works for sky AND textured backgrounds
+TOPHAT_THRESHOLD   = 15       # moderate — not too sensitive for textured bg
 
 # -----------------------------------------------------------------------------
 # 3-FRAME DIFFERENCE  (motion/frame_diff.py)
@@ -103,7 +94,7 @@ MASK_COMBINE_MODE = "motion_primary"
 # For a windy background: start at Gap = 2.
 # FRAME_DIFF_THRESHOLD: raise to suppress more background, lower to catch ball.
 FRAME_DIFF_GAP       = 2
-FRAME_DIFF_THRESHOLD = 20
+FRAME_DIFF_THRESHOLD = 18     # balanced for ball detection at half-res
 
 # -----------------------------------------------------------------------------
 # MOG2 BACKGROUND SUBTRACTION  (motion/bg_sub.py)
@@ -119,8 +110,8 @@ FRAME_DIFF_THRESHOLD = 20
 #   Higher → less noise, may miss the ball.
 #
 # detectShadows: always False — shadows waste CPU and create false blobs.
-MOG2_HISTORY        = 500
-MOG2_VAR_THRESHOLD  = 25
+MOG2_HISTORY        = 400
+MOG2_VAR_THRESHOLD  = 20
 MOG2_DETECT_SHADOWS = False
 
 # -----------------------------------------------------------------------------
@@ -128,12 +119,11 @@ MOG2_DETECT_SHADOWS = False
 # -----------------------------------------------------------------------------
 # How to merge the top-hat, frame-diff, and MOG2 masks into one final mask.
 #
-#   "or"             → any signal triggers (most sensitive, most noise)
-#   "and"            → all signals must agree (cleanest, may miss ball)
-#   "tophat_and_any" → top-hat AND (frame_diff OR mog2)  ← recommended start
-#                      top-hat enforces circular small-blob shape,
-#                      temporal signal confirms it actually moved.
-MASK_COMBINE_MODE = "tophat_and_any"
+#   "or"              → any signal triggers (most sensitive, most noise)
+#   "and"             → all signals must agree (cleanest, may miss ball)
+#   "tophat_and_any"  → top-hat AND (frame_diff OR mog2)
+#   "motion_primary"  → (frame_diff OR MOG2) AND top-hat boost
+MASK_COMBINE_MODE = "motion_primary"
 
 # -----------------------------------------------------------------------------
 # MORPHOLOGICAL CLEANING  (motion/morph_clean.py)
@@ -141,27 +131,27 @@ MASK_COMBINE_MODE = "tophat_and_any"
 # CRITICAL: keep the kernel small.
 # A (2,2) kernel only removes isolated single-pixel noise.
 # A (5,5) kernel erases a 4–16 px² ball entirely — the original bug.
-MORPH_KERNEL_SIZE = (2, 2)
+MORPH_KERNEL_SIZE = (3, 3)
 
 # -----------------------------------------------------------------------------
 # BLOB FILTER  (detection/blob_filter.py)
 # -----------------------------------------------------------------------------
 # Area bounds in pixels².
 # At 50 m: ball ≈ 4–16 px².  Raise MIN if noise dots still appear.
-MIN_BLOB_AREA = 5
+MIN_BLOB_AREA = 6
 MAX_BLOB_AREA = 100
 
 # Circularity = 4π·area / perimeter²   (perfect circle = 1.0)
 # Tennis ball: ~0.7–1.0.   Clothes / railings: ~0.1–0.4.
-MIN_CIRCULARITY = 0
+MIN_CIRCULARITY = 0.5
 
 # Solidity = contour_area / convex_hull_area   (perfect convex shape = 1.0)
 # Ball: ~0.8–1.0.   Fabric folds (concave): ~0.3–0.6.
-MIN_SOLIDITY = 0.60
+MIN_SOLIDITY = 0.5
 
 # Aspect ratio guard — reject blobs more elongated than this ratio.
 # A tennis ball in flight is roughly 1:1 to 1.5:1.
-MAX_ASPECT_RATIO = 3.0
+MAX_ASPECT_RATIO = 4.5
 
 # -----------------------------------------------------------------------------
 # TRAJECTORY VALIDATION  (detection/trajectory_fit.py)
@@ -169,8 +159,8 @@ MAX_ASPECT_RATIO = 3.0
 # A projectile under gravity follows a parabola: y = ax² + bx + c.
 # Only tracks that fit this shape within the residual tolerance are kept.
 # Turn ENABLE_TRAJECTORY on only after the tracker is producing stable IDs.
-TRAJECTORY_MIN_POINTS  = 6     # min detections before fitting parabola
-TRAJECTORY_MAX_RESIDUAL = 8.0  # max average pixel error allowed from fit
+TRAJECTORY_MIN_POINTS   = 4    # min detections before fitting parabola
+TRAJECTORY_MAX_RESIDUAL = 10.0  # max average pixel error allowed from fit
 
 # -----------------------------------------------------------------------------
 # KALMAN TRACKER  (tracking/kalman_tracker.py)
@@ -180,7 +170,29 @@ TRAJECTORY_MAX_RESIDUAL = 8.0  # max average pixel error allowed from fit
 # max_missing:  frames a track can survive without any detection
 #   (useful when ball briefly disappears behind a railing).
 KALMAN_MAX_DISTANCE = 60
-KALMAN_MAX_MISSING  = 8
+KALMAN_MAX_MISSING  = 4
+
+# -----------------------------------------------------------------------------
+# TRACK CLASSIFIER  (detection/track_classifier.py)
+# -----------------------------------------------------------------------------
+# Suppresses noise tracks (trees, birds, vibration) and only lets through
+# tracks that look like real projectile motion.
+#
+# A track starts as "pending".  After CLASSIFIER_MIN_AGE frames it is
+# evaluated.  Tracks that pass all checks become "projectile"; others "noise".
+#
+# CLASSIFIER_SHOW_PENDING — draw pending tracks in dim colour (for debugging)
+# CLASSIFIER_SHOW_NOISE   — draw rejected tracks in red (for debugging)
+CLASSIFIER_MIN_AGE             = 4      # lower due to FRAME_SKIP=2
+CLASSIFIER_MIN_DISPLACEMENT    = 20.0   # min net px from start to current
+CLASSIFIER_MIN_SPEED           = 5.0    # min px/frame
+CLASSIFIER_MAX_SPEED           = 100.0   # max px/frame
+CLASSIFIER_MIN_PATH_EFFICIENCY = 0.6    # net displacement / total path length
+                                        # projectile ~0.7, tree ~0.1
+CLASSIFIER_MIN_SPATIAL_SPREAD  = 35.0   # min bbox span (px) of observed points
+CLASSIFIER_MIN_DIRECTION_RATIO = 0.7    # fraction of consistent direction steps
+CLASSIFIER_SHOW_PENDING        = False   # ON for debugging — see what's being detected
+CLASSIFIER_SHOW_NOISE          = False  # show rejected tracks (red, debug only)
 
 # -----------------------------------------------------------------------------
 # TRAIL  (tracking/trail_store.py)
@@ -192,11 +204,11 @@ TRAIL_LENGTH = 40   # number of past centroid positions kept per track
 # -----------------------------------------------------------------------------
 # When ENABLE_DEBUG_VIEW = True these control which mask windows appear.
 # Turn individual windows off to reduce screen clutter once that stage works.
-DEBUG_SHOW_TOPHAT      = True
-DEBUG_SHOW_FRAME_DIFF  = True
-DEBUG_SHOW_BG_SUB      = True
-DEBUG_SHOW_COMBINED    = True
-DEBUG_SHOW_CLEANED     = True
+DEBUG_SHOW_TOPHAT      = False
+DEBUG_SHOW_FRAME_DIFF  = False
+DEBUG_SHOW_BG_SUB      = False
+DEBUG_SHOW_COMBINED    = False
+DEBUG_SHOW_CLEANED     = False
 
 DISPLAY_MAX_W = 1280
 DISPLAY_MAX_H = 720
@@ -283,7 +295,7 @@ if __name__ == "__main__":
         (MORPH_KERNEL_SIZE[0] <= 3,            "MORPH_KERNEL_SIZE should be <= (3,3) for tiny objects"),
         (TOPHAT_KERNEL_SIZE[0] > MORPH_KERNEL_SIZE[0], "TOPHAT kernel should be larger than MORPH kernel"),
         (FRAME_DIFF_GAP >= 1,                  "FRAME_DIFF_GAP must be >= 1"),
-        (MASK_COMBINE_MODE in ("or","and","tophat_and_any"), "MASK_COMBINE_MODE must be or/and/tophat_and_any"),
+        (MASK_COMBINE_MODE in ("or","and","tophat_and_any","motion_primary"), "MASK_COMBINE_MODE must be or/and/tophat_and_any/motion_primary"),
     ]
     all_ok = True
     for passed, msg in checks:

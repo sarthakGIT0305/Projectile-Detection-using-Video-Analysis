@@ -2,12 +2,11 @@
 # main.py
 # =============================================================================
 # Orchestrates the full detection-tracking pipeline.
-#
 # Pipeline order every frame:
 #   1.  Read frame 
 #   2.  ROI crop
 #   3.  CLAHE grayscale
-#   4.  Top-hat spatial filter
+#   4.  Top-hat spatial filter 
 #   5.  3-frame temporal difference
 #   6.  MOG2 background subtraction
 #   7.  Combine motion masks
@@ -31,6 +30,7 @@ import sys
 
 from config import (
     VIDEO_PATH,
+    PROCESS_SCALE, FRAME_SKIP,
     ENABLE_ROI, ROI_PERCENT, ROI_ANCHOR_X, ROI_ANCHOR_Y,
     ENABLE_CLAHE, CLAHE_CLIP_LIMIT, CLAHE_TILE_GRID,
     ENABLE_TOPHAT, TOPHAT_KERNEL_SIZE, TOPHAT_THRESHOLD, TOPHAT_MODE,
@@ -44,6 +44,12 @@ from config import (
     ENABLE_TRAJECTORY, TRAJECTORY_MIN_POINTS, TRAJECTORY_MAX_RESIDUAL,
     ENABLE_KALMAN, KALMAN_MAX_DISTANCE, KALMAN_MAX_MISSING,
     ENABLE_TRAIL, TRAIL_LENGTH,
+    ENABLE_CLASSIFIER,
+    CLASSIFIER_MIN_AGE, CLASSIFIER_MIN_DISPLACEMENT,
+    CLASSIFIER_MIN_SPEED, CLASSIFIER_MAX_SPEED,
+    CLASSIFIER_MIN_PATH_EFFICIENCY, CLASSIFIER_MIN_SPATIAL_SPREAD,
+    CLASSIFIER_MIN_DIRECTION_RATIO,
+    CLASSIFIER_SHOW_PENDING, CLASSIFIER_SHOW_NOISE,
     ENABLE_DEBUG_VIEW,
     DEBUG_SHOW_TOPHAT, DEBUG_SHOW_FRAME_DIFF,
     DEBUG_SHOW_BG_SUB, DEBUG_SHOW_COMBINED, DEBUG_SHOW_CLEANED,
@@ -63,6 +69,7 @@ from motion.morph_clean          import clean_mask
 from detection.contour_detect    import detect_contours
 from detection.blob_filter       import filter_blobs
 from detection.trajectory_fit    import TrajectoryValidator
+from detection.track_classifier  import TrackClassifier
 from tracking.kalman_tracker     import KalmanTracker
 from tracking.trail_store        import TrailStore
 
@@ -102,24 +109,77 @@ def _show_debug_masks(masks: dict):
             cv2.imshow(title, _resize_for_display(vis))
 
 
-def _draw_tracks(frame       : np.ndarray,
-                 tracks      : list,
-                 trail_store : TrailStore,
-                 validators  : dict,
-                 show_trail  : bool) -> np.ndarray:
-    """Draw bounding boxes, IDs, trails, and parabola arcs onto frame."""
+def _draw_tracks(frame        : np.ndarray,
+                 tracks       : list,
+                 trail_store  : TrailStore,
+                 validators   : dict,
+                 classifier   : 'TrackClassifier | None',
+                 show_trail   : bool) -> np.ndarray:
+    """Draw bounding boxes, IDs, trails, and parabola arcs onto frame.
+
+    When the classifier is active, only 'projectile' tracks are drawn
+    prominently.  'pending' and 'noise' tracks are optionally shown
+    based on CLASSIFIER_SHOW_PENDING / CLASSIFIER_SHOW_NOISE.
+    """
     out = frame.copy()
 
     # Trails first so boxes are drawn on top
     if show_trail:
-        trail_store.draw_all_trails(out, colors=TRACK_COLORS)
+        # Only draw trails for tracks that will be visible
+        if classifier is not None:
+            visible_ids = set()
+            for t in tracks:
+                cls = classifier.get(t["id"])
+                if cls == "projectile":
+                    visible_ids.add(t["id"])
+                elif cls == "pending" and CLASSIFIER_SHOW_PENDING:
+                    visible_ids.add(t["id"])
+                elif cls == "noise" and CLASSIFIER_SHOW_NOISE:
+                    visible_ids.add(t["id"])
+            # Draw only visible trails
+            for tid in visible_ids:
+                trail = trail_store.get(tid)
+                if trail is None or len(trail) < 2:
+                    continue
+                cls = classifier.get(tid)
+                base_color = TRACK_COLORS[tid % len(TRACK_COLORS)]
+                if cls == "noise":
+                    base_color = (0, 0, 180)  # red for noise
+                elif cls == "pending":
+                    base_color = tuple(int(c * 0.35) for c in base_color)
+                pts = list(trail)
+                n = len(pts)
+                for i in range(1, n):
+                    p1 = (pts[i-1][0], pts[i-1][1])
+                    p2 = (pts[i][0], pts[i][1])
+                    alpha = 0.3 + 0.7 * (i / (n - 1))
+                    c = tuple(int(ch * alpha) for ch in base_color)
+                    cv2.line(out, p1, p2, c, 2)
+        else:
+            trail_store.draw_all_trails(out, colors=TRACK_COLORS)
 
     for t in tracks:
         tid        = t["id"]
         cx, cy     = t["center"]
         x, y, w, h = t["bbox"]
-        color      = TRACK_COLORS[tid % len(TRACK_COLORS)]
         miss       = t["missing"]
+
+        # Determine classification
+        cls = classifier.get(tid) if classifier is not None else "projectile"
+
+        # Skip tracks based on classification
+        if cls == "noise" and not CLASSIFIER_SHOW_NOISE:
+            continue
+        if cls == "pending" and not CLASSIFIER_SHOW_PENDING:
+            continue
+
+        # Colour coding by classification
+        if cls == "projectile":
+            color = TRACK_COLORS[tid % len(TRACK_COLORS)]
+        elif cls == "pending":
+            color = tuple(int(c * 0.35) for c in TRACK_COLORS[tid % len(TRACK_COLORS)])
+        else:  # noise
+            color = (0, 0, 180)  # red
 
         # Dim the box colour when predicting (no detection this frame)
         box_color = tuple(int(c * 0.45) for c in color) if miss > 0 else color
@@ -137,14 +197,19 @@ def _draw_tracks(frame       : np.ndarray,
                 label += " OK"
             else:
                 label += " ?"
+        # Classification indicator
+        if cls == "noise":
+            label += " X"
+        elif cls == "pending":
+            label += " ~"
 
         cv2.putText(out, label,
                     (x, max(y - 3, 10)),
                     FONT_FACE, FONT_SCALE, color, FONT_THICKNESS)
         cv2.circle(out, (cx, cy), 3, color, -1)
 
-        # Fitted parabola arc (only when trajectory validation is on + valid)
-        if ENABLE_TRAJECTORY and val is not None and val.is_valid():
+        # Fitted parabola arc (only for projectile tracks)
+        if cls == "projectile" and ENABLE_TRAJECTORY and val is not None and val.is_valid():
             arc = val.get_fitted_points()
             if arc and len(arc) > 1:
                 h_img, w_img = out.shape[:2]
@@ -157,11 +222,12 @@ def _draw_tracks(frame       : np.ndarray,
     return out
 
 
-def _draw_hud(frame     : np.ndarray,
-              frame_idx : int,
-              n_tracks  : int,
-              n_dets    : int,
-              warmed_up : bool) -> np.ndarray:
+def _draw_hud(frame         : np.ndarray,
+              frame_idx     : int,
+              n_tracks      : int,
+              n_dets        : int,
+              n_projectiles : int,
+              warmed_up     : bool) -> np.ndarray:
     """Minimal heads-up display overlay."""
     h, w = frame.shape[:2]
 
@@ -172,8 +238,10 @@ def _draw_hud(frame     : np.ndarray,
                     (6, h - 5),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.36, (80, 200, 80), 1)
 
-    cv2.putText(frame,
-                f"frame={frame_idx}  tracks={n_tracks}  dets={n_dets}",
+    hud_text = f"frame={frame_idx}  tracks={n_tracks}  dets={n_dets}"
+    if ENABLE_CLASSIFIER:
+        hud_text += f"  projectiles={n_projectiles}"
+    cv2.putText(frame, hud_text,
                 (6, 18),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 100), 1)
 
@@ -182,6 +250,50 @@ def _draw_hud(frame     : np.ndarray,
                 "SPACE=pause  S=screenshot  D=debug  Q=quit",
                 (6, 36),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.35, (160, 160, 160), 1)
+
+    return frame
+
+
+ALARM_HOLD_FRAMES = 30   # keep alarm visible for this many frames after last projectile
+
+def _draw_alarm(frame: np.ndarray, active: bool, fade: float = 1.0) -> np.ndarray:
+    """Draw a projectile-detected alarm overlay.
+
+    Parameters
+    ----------
+    frame  : np.ndarray  BGR image.
+    active : bool        True if a projectile is currently confirmed.
+    fade   : float       1.0 = full intensity, fades toward 0 as alarm expires.
+    """
+    if not active and fade <= 0:
+        return frame
+
+    h, w = frame.shape[:2]
+    alpha = max(0.0, min(1.0, fade))
+    intensity = int(255 * alpha)
+
+    # ── Green border flash ────────────────────────────────────────────
+    border = 4
+    color = (0, intensity, 0)
+    cv2.rectangle(frame, (0, 0), (w - 1, h - 1), color, border)
+    cv2.rectangle(frame, (border, border),
+                  (w - 1 - border, h - 1 - border), color, border // 2)
+
+    # ── Banner ────────────────────────────────────────────────────────
+    banner_h = 36
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (0, h - banner_h - 24), (w, h - 24),
+                  (0, 40, 0), -1)
+    cv2.addWeighted(overlay, 0.6 * alpha, frame, 1 - 0.6 * alpha, 0, frame)
+
+    text = "PROJECTILE DETECTED"
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale = 0.7
+    (tw, th), _ = cv2.getTextSize(text, font, scale, 2)
+    tx = (w - tw) // 2
+    ty = h - 24 - (banner_h - th) // 2
+    cv2.putText(frame, text, (tx, ty), font, scale,
+                (0, intensity, 0), 2)
 
     return frame
 
@@ -218,6 +330,7 @@ def main():
     print(f"    Kalman tracker : {'ON' if ENABLE_KALMAN     else 'OFF'}")
     print(f"    Trail          : {'ON' if ENABLE_TRAIL      else 'OFF'}  length={TRAIL_LENGTH}")
     print(f"    Trajectory     : {'ON' if ENABLE_TRAJECTORY else 'OFF'}")
+    print(f"    Classifier     : {'ON' if ENABLE_CLASSIFIER else 'OFF'}")
     print(f"    Debug view     : {'ON' if ENABLE_DEBUG_VIEW else 'OFF'}")
     print(f"\n  Press Q or ESC to quit.")
     print(f"  Press SPACE to pause / resume.")
@@ -237,6 +350,16 @@ def main():
     trail_store = TrailStore(TRAIL_LENGTH) \
                   if ENABLE_TRAIL else TrailStore(0)
 
+    classifier  = TrackClassifier(
+                      min_age=CLASSIFIER_MIN_AGE,
+                      min_displacement=CLASSIFIER_MIN_DISPLACEMENT,
+                      min_speed=CLASSIFIER_MIN_SPEED,
+                      max_speed=CLASSIFIER_MAX_SPEED,
+                      min_path_efficiency=CLASSIFIER_MIN_PATH_EFFICIENCY,
+                      min_spatial_spread=CLASSIFIER_MIN_SPATIAL_SPREAD,
+                      min_direction_ratio=CLASSIFIER_MIN_DIRECTION_RATIO,
+                  ) if ENABLE_CLASSIFIER else None
+
     # Trajectory validators — one created per track ID on demand
     validators: dict = {}
 
@@ -244,10 +367,15 @@ def main():
     frame_idx    = 0
     screenshot_n = 0
     debug_on     = ENABLE_DEBUG_VIEW
+    alarm_counter = 0
 
     # ── Main loop ─────────────────────────────────────────────────────
     for frame in reader.frames():
         frame_idx += 1
+
+        # ── Frame skip ────────────────────────────────────────────────
+        if FRAME_SKIP > 1 and (frame_idx % FRAME_SKIP) != 0:
+            continue
 
         # ── Stage 1: ROI ──────────────────────────────────────────────
         if ENABLE_ROI:
@@ -256,6 +384,13 @@ def main():
             )
         else:
             roi_frame, offset = frame, (0, 0)
+
+        # ── Stage 1.5: Downscale for processing ──────────────────────
+        display_frame = roi_frame                     # keep full-res for drawing
+        if PROCESS_SCALE < 1.0:
+            roi_frame = cv2.resize(roi_frame, None,
+                                   fx=PROCESS_SCALE, fy=PROCESS_SCALE,
+                                   interpolation=cv2.INTER_AREA)
 
         # ── Stage 2: CLAHE grayscale ──────────────────────────────────
         gray = to_gray(roi_frame, CLAHE_CLIP_LIMIT,
@@ -314,6 +449,16 @@ def main():
                 for i, d in enumerate(detections)
             ]
 
+        # ── Stage 10.5: Scale coordinates back to full-res ─────────────
+        if PROCESS_SCALE < 1.0:
+            inv = 1.0 / PROCESS_SCALE
+            for t in tracks:
+                cx, cy = t["center"]
+                t["center"] = (int(cx * inv), int(cy * inv))
+                x, y, w, h = t["bbox"]
+                t["bbox"] = (int(x * inv), int(y * inv),
+                             int(w * inv), int(h * inv))
+
         # ── Stage 11: Trail storage ───────────────────────────────────
         trail_store.update(tracks)
 
@@ -339,14 +484,35 @@ def main():
         else:
             validators = {}
 
+        # ── Stage 12.5: Track classification ──────────────────────────
+        if classifier is not None:
+            classifier.update(tracks, trail_store, validators)
+
+        # Count projectiles for HUD
+        n_projectiles = 0
+        if classifier is not None:
+            n_projectiles = sum(
+                1 for t in tracks if classifier.get(t["id"]) == "projectile"
+            )
+
+        # ── Alarm logic ───────────────────────────────────────────────
+        if n_projectiles > 0:
+            if alarm_counter == 0:
+                print(f"  ⚠ PROJECTILE DETECTED at frame {frame_idx}!")
+            alarm_counter = ALARM_HOLD_FRAMES
+        else:
+            alarm_counter = max(0, alarm_counter - 1)
+
         # ── Stage 13: Draw ────────────────────────────────────────────
         output = _draw_tracks(
-            roi_frame, tracks, trail_store, validators,
+            display_frame, tracks, trail_store, validators,
+            classifier=classifier,
             show_trail=ENABLE_TRAIL
         )
         output = _draw_hud(
             output, frame_idx,
             len(tracks), len(detections),
+            n_projectiles,
             bgs.is_warmed_up
         )
 
@@ -360,7 +526,12 @@ def main():
                 "cleaned"   : cleaned,
             })
 
-        # ── Stage 15: Display ─────────────────────────────────────────
+        # ── Stage 15: Alarm overlay ───────────────────────────────────
+        if alarm_counter > 0:
+            fade = alarm_counter / ALARM_HOLD_FRAMES
+            output = _draw_alarm(output, n_projectiles > 0, fade)
+
+        # ── Stage 16: Display ─────────────────────────────────────────
         display = _resize_for_display(output)
         cv2.imshow("Ball Detector  —  Q to quit", display)
 

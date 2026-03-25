@@ -28,7 +28,7 @@ def apply_roi(frame: np.ndarray, percent: float,
     """
     anchor_x, anchor_y are fractions (0.0 – 1.0) of the full frame.
     They define where the CENTER of the ROI box sits.
-
+ 
     Examples:
       anchor_x=0.5, anchor_y=0.5  →  centered             (default)
       anchor_x=0.0, anchor_y=0.0  →  top-left corner

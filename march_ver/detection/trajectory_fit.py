@@ -61,6 +61,7 @@
 # =============================================================================
 
 import numpy as np
+import warnings
 from typing import List, Tuple, Optional, Dict
 from collections import deque
 
@@ -109,7 +110,9 @@ class TrajectoryValidator:
             return
 
         try:
-            coeffs    = np.polyfit(xs, ys, deg=2)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                coeffs    = np.polyfit(xs, ys, deg=2)
             y_pred    = np.polyval(coeffs, xs)
             residuals = np.abs(ys - y_pred)
             self._residual = float(np.mean(residuals))
