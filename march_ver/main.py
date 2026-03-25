@@ -142,11 +142,13 @@ def _draw_tracks(frame        : np.ndarray,
                 if trail is None or len(trail) < 2:
                     continue
                 cls = classifier.get(tid)
-                base_color = TRACK_COLORS[tid % len(TRACK_COLORS)]
-                if cls == "noise":
+                
+                if cls == "projectile":
+                    base_color = COLOR_TRAIL
+                elif cls == "noise":
                     base_color = (0, 0, 180)  # red for noise
-                elif cls == "pending":
-                    base_color = tuple(int(c * 0.35) for c in base_color)
+                else:
+                    base_color = tuple(int(c * 0.35) for c in TRACK_COLORS[tid % len(TRACK_COLORS)])
                 pts = list(trail)
                 n = len(pts)
                 for i in range(1, n):
@@ -190,13 +192,29 @@ def _draw_tracks(frame        : np.ndarray,
         label = f"ID:{tid}"
         if miss > 0:
             label += f" P{miss}"
+            
+        if t.get("suspect_innovation"):
+            label += " G"
+            
         if ENABLE_TRAJECTORY and val is not None:
             if not val.is_ready():
                 label += " ..."
-            elif val.is_valid():
-                label += " OK"
             else:
-                label += " ?"
+                fails = []
+                info = val.get_info()
+                if info.get("residual") is not None and info["residual"] > val.max_residual:
+                    fails.append("R")
+                if hasattr(val, '_vel_validator') and not val._vel_validator.is_valid():
+                    fails.append("V")
+                if hasattr(val, '_check_shape_descriptors') and not val._check_shape_descriptors():
+                    fails.append("S")
+                
+                if not fails and val.is_valid():
+                    label += " OK"
+                elif fails:
+                    label += f" {''.join(fails)}"
+                else:
+                    label += " ?"
         # Classification indicator
         if cls == "noise":
             label += " X"

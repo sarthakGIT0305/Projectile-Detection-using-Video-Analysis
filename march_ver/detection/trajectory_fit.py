@@ -64,6 +64,15 @@ import numpy as np
 import warnings
 from typing import List, Tuple, Optional, Dict
 from collections import deque
+from detection.velocity_validator import VelocityValidator
+from config import (
+    TRAJECTORY_MAX_ARC_RATIO,
+    TRAJECTORY_MAX_APEX_COUNT,
+    TRAJECTORY_MAX_SPEED_JITTER,
+    VELOCITY_DX_MAX_VARIANCE,
+    VELOCITY_DY_MIN_R2,
+    VELOCITY_MAX_DIRECTION_FLIPS,
+)
 
 
 class TrajectoryValidator:
@@ -87,10 +96,17 @@ class TrajectoryValidator:
         self._history     = deque(maxlen=max(min_points * 3, 20))
         self._residual    = None
         self._coeffs      = None   # [a, b, c] from polyfit
+        self._vel_validator = VelocityValidator(
+            max_history=30,
+            dx_max_variance=VELOCITY_DX_MAX_VARIANCE,
+            dy_min_r2=VELOCITY_DY_MIN_R2,
+            max_direction_flips=VELOCITY_MAX_DIRECTION_FLIPS,
+        )
 
     def update(self, cx: int, cy: int):
         """Add a new centroid observation."""
         self._history.append((cx, cy))
+        self._vel_validator.update(cx, cy)
         self._fit()
 
     def _fit(self):
@@ -125,11 +141,17 @@ class TrajectoryValidator:
         """True if track has enough points AND fits a parabola well."""
         if self._residual is None:
             return False
-        return self._residual <= self.max_residual
+        if self._residual > self.max_residual:
+            return False
+        if not self._vel_validator.is_valid():
+            return False
+        if not self._check_shape_descriptors():
+            return False
+        return True
 
     def is_ready(self) -> bool:
         """True once enough points have been collected to attempt a fit."""
-        return len(self._history) >= self.min_points
+        return len(self._history) >= self.min_points and self._vel_validator.is_ready()
 
     def get_residual(self) -> Optional[float]:
         return self._residual
@@ -143,6 +165,9 @@ class TrajectoryValidator:
             "is_ready"  : self.is_ready(),
             "direction" : None,
             "phase"     : None,
+            "arc_ratio" : None,
+            "apex_count": None,
+            "speed_jitter": None,
         }
         if self._coeffs is not None and len(self._history) >= 2:
             xs = [p[0] for p in self._history]
@@ -160,12 +185,55 @@ class TrajectoryValidator:
                 info["phase"] = "ascending"
             else:
                 info["phase"] = "descending"
+            info.update(self._compute_shape_descriptors())
         return info
+
+    def _compute_shape_descriptors(self) -> dict:
+        """Compute arc ratio, apex count, and speed jitter."""
+        if len(self._history) < 2:
+            return {"arc_ratio": 0.0, "apex_count": 0, "speed_jitter": 0.0}
+        xs = np.array([p[0] for p in self._history], dtype=np.float64)
+        ys = np.array([p[1] for p in self._history], dtype=np.float64)
+        # Arc ratio: vertical span / horizontal span
+        vert_span = ys.max() - ys.min()
+        horiz_span = xs.max() - xs.min()
+        arc_ratio = float(vert_span / horiz_span) if horiz_span != 0 else float('inf')
+        
+        # Apex count: count local minima in y
+        dy = np.diff(ys)
+        sign_changes = np.diff(np.sign(dy))
+        apex_count = int(np.sum((sign_changes > 0)))  # negative to positive indicates a min
+        
+        # Speed jitter: variance of Euclidean speeds
+        dxs = np.diff(xs)
+        dys = np.diff(ys)
+        speeds = np.sqrt(dxs**2 + dys**2)
+        speed_jitter = float(np.var(speeds)) if speeds.size > 0 else 0.0
+        
+        return {
+            "arc_ratio": arc_ratio,
+            "apex_count": apex_count,
+            "speed_jitter": speed_jitter,
+        }
+
+    def _check_shape_descriptors(self) -> bool:
+        """Validate shape descriptors against config thresholds."""
+        if len(self._history) < self.min_points:
+            return False
+        desc = self._compute_shape_descriptors()
+        if desc["arc_ratio"] > TRAJECTORY_MAX_ARC_RATIO:
+            return False
+        if desc["apex_count"] > TRAJECTORY_MAX_APEX_COUNT:
+            return False
+        if desc["speed_jitter"] > TRAJECTORY_MAX_SPEED_JITTER:
+            return False
+        return True
 
     def reset(self):
         self._history.clear()
         self._residual = None
         self._coeffs   = None
+        self._vel_validator.reset()
 
     def get_fitted_points(self, n: int = 50) -> Optional[List[Tuple[int,int]]]:
         """Return points along the fitted parabola for drawing.

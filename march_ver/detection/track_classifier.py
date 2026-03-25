@@ -41,6 +41,8 @@
 # =============================================================================
 
 import math
+import warnings
+import numpy as np
 from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
 
@@ -100,11 +102,16 @@ class TrackClassifier:
 
             # Not enough frames yet
             if age < self.min_age:
-                self._labels[tid] = "pending"
+                if self._labels.get(tid) != "projectile":
+                    self._labels[tid] = "pending"
                 continue
 
             # Run all checks
-            self._labels[tid] = self._classify(t, trail_store, validators)
+            new_label = self._classify(t, trail_store, validators)
+            if self._labels.get(tid) == "projectile":
+                self._labels[tid] = "projectile"
+            else:
+                self._labels[tid] = new_label
 
         # Prune dead tracks
         dead = [tid for tid in self._labels if tid not in active_ids]
@@ -179,7 +186,12 @@ class TrackClassifier:
             if not consistent:
                 return "noise"
 
-        # ── Check 6: Trajectory validation (parabola fit) ─────────────
+        # ── Check 6: Clean Arc Fast-Track ─────────────────────────────
+        # If the track forms a beautiful, unmistakable arc, skip the strict validation
+        if self._is_clean_arc(points):
+            return "projectile"
+
+        # ── Check 7: Trajectory validation (strict parabola fit) ──────
         val = validators.get(tid)
         if val is not None:
             if val.is_ready():
@@ -189,6 +201,49 @@ class TrackClassifier:
                 return "pending"
 
         return "projectile"
+
+    def _is_clean_arc(self, points: List[Tuple[int, int]]) -> bool:
+        """
+        Robust heuristic to identify clean, parabolic arcs (like a ball flight)
+        even if strict per-frame velocity checks fail.
+        """
+        if len(points) < 8:
+            return False
+            
+        xs = np.array([p[0] for p in points], dtype=np.float64)
+        ys = np.array([p[1] for p in points], dtype=np.float64)
+        
+        # 1. Path Efficiency (must be highly direct)
+        total_path = 0.0
+        for i in range(1, len(points)):
+            sdx = points[i][0] - points[i-1][0]
+            sdy = points[i][1] - points[i-1][1]
+            total_path += math.sqrt(sdx*sdx + sdy*sdy)
+            
+        net_dx = points[-1][0] - points[0][0]
+        net_dy = points[-1][1] - points[0][1]
+        net_disp = math.sqrt(net_dx*net_dx + net_dy*net_dy)
+        
+        if total_path == 0 or (net_disp / total_path) < 0.8:
+            return False # Too much jitter/wobble
+            
+        # 2. Fit a parabola and check absolute visual residual
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                coeffs = np.polyfit(xs, ys, deg=2)
+            y_pred = np.polyval(coeffs, xs)
+            residuals = np.abs(ys - y_pred)
+            mean_residual = float(np.mean(residuals))
+            
+            # If the mean pixel error is very low (visually perfect arc)
+            # AND it has travelled a decent distance, it's a projectile.
+            if mean_residual < 15.0 and (abs(net_dx) > 100 or abs(net_dy) > 100):
+                return True
+        except Exception:
+            pass
+            
+        return False
 
     def _check_horizontal_consistency(self, points: list, overall_dx: float) -> bool:
         """Check that most frame-to-frame x-movements agree with overall direction."""

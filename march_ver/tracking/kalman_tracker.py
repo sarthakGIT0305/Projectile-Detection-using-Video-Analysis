@@ -50,6 +50,11 @@
 import cv2
 import numpy as np
 from typing import Dict, List, Tuple, Optional
+from config import (
+    KALMAN_USE_GRAVITY,
+    KALMAN_GRAVITY_PIXELS_PER_FRAME2,
+    KALMAN_MAX_INNOVATION,
+)
 
 try:
     from scipy.optimize import linear_sum_assignment
@@ -74,11 +79,13 @@ class _Track:
         self.missing = 0            # consecutive frames without detection
         self.last_detection = None  # most recent detection dict (or None)
         self.predicted = False      # True if current position is prediction only
+        self.innovation = 0.0       # distance between prediction and correction
 
     @staticmethod
     def _create_kalman(cx: int, cy: int) -> cv2.KalmanFilter:
         """Build a 4-state (x, y, vx, vy) Kalman filter."""
-        kf = cv2.KalmanFilter(4, 2)
+        n_control = 1 if KALMAN_USE_GRAVITY else 0
+        kf = cv2.KalmanFilter(4, 2, n_control)
 
         # Transition matrix: constant-velocity model
         kf.transitionMatrix = np.array([
@@ -87,6 +94,14 @@ class _Track:
             [0, 0, 1, 0],
             [0, 0, 0, 1],
         ], dtype=np.float32)
+
+        if KALMAN_USE_GRAVITY:
+            kf.controlMatrix = np.array([
+                [0.0],
+                [0.5],
+                [0.0],
+                [1.0]
+            ], dtype=np.float32)
 
         # Measurement matrix: we observe x, y only
         kf.measurementMatrix = np.array([
@@ -111,13 +126,18 @@ class _Track:
 
     def predict(self) -> Tuple[int, int]:
         """Advance the Kalman filter one step and return predicted (cx, cy)."""
-        pred = self.kf.predict()
+        if KALMAN_USE_GRAVITY:
+            control = np.array([[KALMAN_GRAVITY_PIXELS_PER_FRAME2]], dtype=np.float32)
+            pred = self.kf.predict(control)
+        else:
+            pred = self.kf.predict()
         return int(pred[0, 0]), int(pred[1, 0])
 
-    def correct(self, cx: int, cy: int):
+    def correct(self, cx: int, cy: int, distance: float = 0.0):
         """Feed a measurement to the Kalman filter."""
         measurement = np.array([[cx], [cy]], dtype=np.float32)
         self.kf.correct(measurement)
+        self.innovation = distance
 
     @property
     def position(self) -> Tuple[int, int]:
@@ -156,6 +176,8 @@ class _Track:
             "age":      self.age,
             "predicted": self.predicted,
             "det":      self.last_detection,
+            "innovation": self.innovation,
+            "suspect_innovation": self.innovation > KALMAN_MAX_INNOVATION,
         }
 
 
@@ -226,7 +248,8 @@ class KalmanTracker:
                     track = self._tracks[r]
                     det   = detections[c]
                     cx, cy = det["center"]
-                    track.correct(cx, cy)
+                    distance = float(cost[r, c])
+                    track.correct(cx, cy, distance)
                     track.missing = 0
                     track.predicted = False
                     track.last_detection = det

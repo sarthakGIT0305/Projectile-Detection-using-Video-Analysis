@@ -32,6 +32,11 @@ ENABLE_TRAIL        = True   # draw rolling trajectory trail behind object
 ENABLE_CLASSIFIER   = True  # track classifier — suppress noise, show only projectiles
 ENABLE_DEBUG_VIEW   = True   # show intermediate mask windows while running
 
+# Additional feature flags for new techniques
+ENABLE_VELOCITY_CHECK   = True   # enable velocity profile analysis
+ENABLE_SHAPE_DESCRIPTORS = True   # enable trajectory shape descriptor checks
+KALMAN_USE_GRAVITY              = True   # use physics‑constrained Kalman model
+
 # -----------------------------------------------------------------------------
 # PERFORMANCE
 # -----------------------------------------------------------------------------
@@ -160,7 +165,17 @@ MAX_ASPECT_RATIO = 4.5
 # Only tracks that fit this shape within the residual tolerance are kept.
 # Turn ENABLE_TRAJECTORY on only after the tracker is producing stable IDs.
 TRAJECTORY_MIN_POINTS   = 4    # min detections before fitting parabola
-TRAJECTORY_MAX_RESIDUAL = 10.0  # max average pixel error allowed from fit
+TRAJECTORY_MAX_RESIDUAL = 30.0  # max average pixel error allowed from fit
+
+# Velocity profile analysis thresholds
+VELOCITY_DX_MAX_VARIANCE = 100.0
+VELOCITY_DY_MIN_R2       = 0.1
+VELOCITY_MAX_DIRECTION_FLIPS = 1
+
+# Trajectory shape descriptor thresholds
+TRAJECTORY_MAX_ARC_RATIO     = 2.5
+TRAJECTORY_MAX_APEX_COUNT    = 3
+TRAJECTORY_MAX_SPEED_JITTER  = 90.0
 
 # -----------------------------------------------------------------------------
 # KALMAN TRACKER  (tracking/kalman_tracker.py)
@@ -171,6 +186,10 @@ TRAJECTORY_MAX_RESIDUAL = 10.0  # max average pixel error allowed from fit
 #   (useful when ball briefly disappears behind a railing).
 KALMAN_MAX_DISTANCE = 60
 KALMAN_MAX_MISSING  = 4
+
+# Physics‑constrained Kalman settings
+KALMAN_GRAVITY_PIXELS_PER_FRAME2 = 0.5
+KALMAN_MAX_INNOVATION = 30.0
 
 # -----------------------------------------------------------------------------
 # TRACK CLASSIFIER  (detection/track_classifier.py)
@@ -187,17 +206,17 @@ CLASSIFIER_MIN_AGE             = 4      # lower due to FRAME_SKIP=2
 CLASSIFIER_MIN_DISPLACEMENT    = 20.0   # min net px from start to current
 CLASSIFIER_MIN_SPEED           = 5.0    # min px/frame
 CLASSIFIER_MAX_SPEED           = 100.0   # max px/frame
-CLASSIFIER_MIN_PATH_EFFICIENCY = 0.6    # net displacement / total path length
+CLASSIFIER_MIN_PATH_EFFICIENCY = 0.3    # net displacement / total path length
                                         # projectile ~0.7, tree ~0.1
 CLASSIFIER_MIN_SPATIAL_SPREAD  = 35.0   # min bbox span (px) of observed points
 CLASSIFIER_MIN_DIRECTION_RATIO = 0.7    # fraction of consistent direction steps
-CLASSIFIER_SHOW_PENDING        = False   # ON for debugging — see what's being detected
-CLASSIFIER_SHOW_NOISE          = False  # show rejected tracks (red, debug only)
+CLASSIFIER_SHOW_PENDING        = True   # ON for debugging — see what's being detected
+CLASSIFIER_SHOW_NOISE          = True  # show rejected tracks (red, debug only)
 
 # -----------------------------------------------------------------------------
 # TRAIL  (tracking/trail_store.py)
 # -----------------------------------------------------------------------------
-TRAIL_LENGTH = 40   # number of past centroid positions kept per track
+TRAIL_LENGTH = 50   # number of past centroid positions kept per track
 
 # -----------------------------------------------------------------------------
 # DEBUG DISPLAY  (utils/debug_view.py)
@@ -220,7 +239,7 @@ COLOR_CENTER = (255, 0, 0)    # blue    centroid dot
 COLOR_TRAIL  = (0, 255, 255)  # yellow  trajectory trail
 
 FONT_FACE      = cv2.FONT_HERSHEY_SIMPLEX
-FONT_SCALE     = 0.45
+FONT_SCALE     = 0.9
 FONT_THICKNESS = 1
 
 
@@ -244,6 +263,9 @@ if __name__ == "__main__":
         "ENABLE_KALMAN"      : ENABLE_KALMAN,
         "ENABLE_TRAIL"       : ENABLE_TRAIL,
         "ENABLE_DEBUG_VIEW"  : ENABLE_DEBUG_VIEW,
+        "ENABLE_VELOCITY_CHECK": ENABLE_VELOCITY_CHECK,
+        "ENABLE_SHAPE_DESCRIPTORS": ENABLE_SHAPE_DESCRIPTORS,
+        "KALMAN_USE_GRAVITY" : KALMAN_USE_GRAVITY,
     }
 
     params = {
@@ -269,6 +291,14 @@ if __name__ == "__main__":
         "TRAJECTORY_MAX_RESIDUAL": TRAJECTORY_MAX_RESIDUAL,
         "KALMAN_MAX_DISTANCE"  : KALMAN_MAX_DISTANCE,
         "KALMAN_MAX_MISSING"   : KALMAN_MAX_MISSING,
+        "KALMAN_GRAVITY_PIXELS_PER_FRAME2": KALMAN_GRAVITY_PIXELS_PER_FRAME2,
+        "KALMAN_MAX_INNOVATION": KALMAN_MAX_INNOVATION,
+        "VELOCITY_DX_MAX_VARIANCE": VELOCITY_DX_MAX_VARIANCE,
+        "VELOCITY_DY_MIN_R2": VELOCITY_DY_MIN_R2,
+        "VELOCITY_MAX_DIRECTION_FLIPS": VELOCITY_MAX_DIRECTION_FLIPS,
+        "TRAJECTORY_MAX_ARC_RATIO": TRAJECTORY_MAX_ARC_RATIO,
+        "TRAJECTORY_MAX_APEX_COUNT": TRAJECTORY_MAX_APEX_COUNT,
+        "TRAJECTORY_MAX_SPEED_JITTER": TRAJECTORY_MAX_SPEED_JITTER,
         "TRAIL_LENGTH"         : TRAIL_LENGTH,
     }
 
