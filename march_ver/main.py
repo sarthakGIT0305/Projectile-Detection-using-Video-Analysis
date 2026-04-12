@@ -41,6 +41,7 @@ from config import (
     ENABLE_BLOB_FILTER,
     MIN_BLOB_AREA, MAX_BLOB_AREA,
     MIN_CIRCULARITY, MIN_SOLIDITY, MAX_ASPECT_RATIO,
+    ENABLE_ISOLATION_FILTER, ISOLATION_RADIUS, ISOLATION_MIN_CLUSTER,
     ENABLE_TRAJECTORY, TRAJECTORY_MIN_POINTS, TRAJECTORY_MAX_RESIDUAL,
     ENABLE_KALMAN, KALMAN_MAX_DISTANCE, KALMAN_MAX_MISSING,
     ENABLE_TRAIL, TRAIL_LENGTH,
@@ -50,9 +51,12 @@ from config import (
     CLASSIFIER_MIN_PATH_EFFICIENCY, CLASSIFIER_MIN_SPATIAL_SPREAD,
     CLASSIFIER_MIN_DIRECTION_RATIO,
     CLASSIFIER_SHOW_PENDING, CLASSIFIER_SHOW_NOISE,
-    ENABLE_DEBUG_VIEW,
+    ENABLE_DEBUG_VIEW, TEMP_DISABLE_TRACKING,
     DEBUG_SHOW_TOPHAT, DEBUG_SHOW_FRAME_DIFF,
     DEBUG_SHOW_BG_SUB, DEBUG_SHOW_COMBINED, DEBUG_SHOW_CLEANED,
+    DEBUG_SHOW_CONTOURS, DEBUG_SHOW_FILTER_AREA,
+    DEBUG_SHOW_FILTER_ASPECT, DEBUG_SHOW_FILTER_CIRCULAR,
+    DEBUG_SHOW_FILTER_SOLIDITY, DEBUG_SHOW_FINAL_DETECTION,
     DISPLAY_MAX_W, DISPLAY_MAX_H,
     COLOR_BBOX, COLOR_ID, COLOR_CENTER, COLOR_TRAIL,
     FONT_FACE, FONT_SCALE, FONT_THICKNESS,
@@ -68,6 +72,7 @@ from motion.mask_combine         import combine_masks
 from motion.morph_clean          import clean_mask
 from detection.contour_detect    import detect_contours
 from detection.blob_filter       import filter_blobs
+from detection.isolation_filter  import reject_clustered_blobs
 from detection.trajectory_fit    import TrajectoryValidator
 from detection.track_classifier  import TrackClassifier
 from tracking.kalman_tracker     import KalmanTracker
@@ -78,6 +83,25 @@ from tracking.trail_store        import TrailStore
 TRACK_COLORS = [
     (0,255,0), (0,200,255), (255,100,0), (200,0,255),
     (0,255,200), (255,255,0), (100,100,255), (255,0,100),
+]
+
+TRACKING_ACTIVE   = ENABLE_KALMAN and not TEMP_DISABLE_TRACKING
+TRAJECTORY_ACTIVE = ENABLE_TRAJECTORY and TRACKING_ACTIVE
+TRAIL_ACTIVE      = ENABLE_TRAIL and TRACKING_ACTIVE
+CLASSIFIER_ACTIVE = ENABLE_CLASSIFIER and TRACKING_ACTIVE
+
+DEBUG_WINDOWS = [
+    "Debug: top-hat",
+    "Debug: frame diff",
+    "Debug: MOG2",
+    "Debug: combined",
+    "Debug: cleaned",
+    "Debug: contours",
+    "Debug: area pass",
+    "Debug: aspect pass",
+    "Debug: circularity pass",
+    "Debug: solidity pass",
+    "Debug: final projectile",
 ]
 
  
@@ -107,6 +131,156 @@ def _show_debug_masks(masks: dict):
             vis = cv2.cvtColor(m, cv2.COLOR_GRAY2BGR) \
                   if len(m.shape) == 2 else m
             cv2.imshow(title, _resize_for_display(vis))
+
+
+def _wants_filter_layer_debug() -> bool:
+    return any([
+        DEBUG_SHOW_CONTOURS,
+        DEBUG_SHOW_FILTER_AREA,
+        DEBUG_SHOW_FILTER_ASPECT,
+        DEBUG_SHOW_FILTER_CIRCULAR,
+        DEBUG_SHOW_FILTER_SOLIDITY,
+        DEBUG_SHOW_FINAL_DETECTION,
+    ])
+
+
+def _filter_blobs_with_layers(contours) -> tuple[list, dict]:
+    """Apply blob filters and keep pass-through contour sets per filter layer."""
+    detections = []
+    layers = {
+        "contours": list(contours),
+        "area": [],
+        "aspect": [],
+        "circularity": [],
+        "solidity": [],
+    }
+
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if area < MIN_BLOB_AREA or area > MAX_BLOB_AREA:
+            continue
+        layers["area"].append(cnt)
+
+        x, y, w, h = cv2.boundingRect(cnt)
+        long_side = max(w, h)
+        short_side = min(w, h)
+        aspect_ratio = long_side / short_side if short_side > 0 else 999.0
+        if aspect_ratio > MAX_ASPECT_RATIO:
+            continue
+        layers["aspect"].append(cnt)
+
+        perimeter = cv2.arcLength(cnt, True)
+        if perimeter < 1e-6:
+            continue
+        circularity = float((4.0 * np.pi * area) / (perimeter ** 2))
+        if circularity < MIN_CIRCULARITY:
+            continue
+        layers["circularity"].append(cnt)
+
+        hull = cv2.convexHull(cnt)
+        hull_area = cv2.contourArea(hull)
+        solidity = area / hull_area if hull_area > 0 else 0.0
+        if solidity < MIN_SOLIDITY:
+            continue
+        layers["solidity"].append(cnt)
+
+        detections.append({
+            "bbox": (x, y, w, h),
+            "center": (x + w // 2, y + h // 2),
+            "area": round(area, 2),
+            "circularity": round(circularity, 3),
+            "solidity": round(solidity, 3),
+            "aspect_ratio": round(aspect_ratio, 2),
+        })
+
+    return detections, layers
+
+
+def _select_primary_projectile(detections: list) -> list:
+    """In no-tracking mode, keep only the best projectile candidate."""
+    if not detections:
+        return []
+
+    target_area = (MIN_BLOB_AREA + MAX_BLOB_AREA) * 0.5
+
+    def score(det: dict) -> float:
+        circ = float(det.get("circularity", 0.0))
+        solid = float(det.get("solidity", 0.0))
+        aspect = float(det.get("aspect_ratio", 1.0))
+        area = float(det.get("area", target_area))
+        area_penalty = abs(area - target_area) / max(target_area, 1.0)
+        aspect_penalty = abs(aspect - 1.0)
+        return (1.8 * circ) + (1.2 * solid) - (0.8 * area_penalty) - (0.4 * aspect_penalty)
+
+    best = max(detections, key=score)
+    return [best]
+
+
+def _scale_detections(detections: list, scale: float) -> list:
+    """Return a copy of detections with bbox/center scaled by ``scale``."""
+    scaled = []
+    for det in detections:
+        out = dict(det)
+        cx, cy = det["center"]
+        x, y, w, h = det["bbox"]
+        out["center"] = (int(cx * scale), int(cy * scale))
+        out["bbox"] = (int(x * scale), int(y * scale),
+                       int(w * scale), int(h * scale))
+        scaled.append(out)
+    return scaled
+
+
+def _draw_projectile_detections(frame: np.ndarray,
+                                detections: list,
+                                color: tuple[int, int, int] = (0, 255, 0)) -> np.ndarray:
+    """Draw detections without IDs (for temporary no-tracking mode)."""
+    out = frame.copy()
+    for det in detections:
+        x, y, w, h = det["bbox"]
+        cx, cy = det["center"]
+        cv2.rectangle(out, (x, y), (x + w, y + h), color, 2)
+        cv2.circle(out, (cx, cy), 3, color, -1)
+    return out
+
+
+def _draw_contour_layer(frame: np.ndarray,
+                        contours: list,
+                        title: str,
+                        color: tuple[int, int, int]) -> np.ndarray:
+    panel = frame.copy()
+    if contours:
+        cv2.drawContours(panel, contours, -1, color, 1)
+    cv2.putText(panel, f"{title}: {len(contours)}",
+                (6, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+    return panel
+
+
+def _show_filter_layers(frame: np.ndarray,
+                        layer_contours: dict | None,
+                        detections: list):
+    """Show per-layer filtering outputs (contours + final detection)."""
+    if layer_contours is None:
+        return
+
+    stage_configs = [
+        ("Debug: contours", DEBUG_SHOW_CONTOURS, "contours", "Contours", (180, 180, 180)),
+        ("Debug: area pass", DEBUG_SHOW_FILTER_AREA, "area", "Area pass", (0, 220, 255)),
+        ("Debug: aspect pass", DEBUG_SHOW_FILTER_ASPECT, "aspect", "Aspect pass", (255, 120, 0)),
+        ("Debug: circularity pass", DEBUG_SHOW_FILTER_CIRCULAR, "circularity", "Circularity pass", (255, 220, 0)),
+        ("Debug: solidity pass", DEBUG_SHOW_FILTER_SOLIDITY, "solidity", "Solidity pass", (0, 255, 0)),
+    ]
+
+    for win_title, enabled, key, label, color in stage_configs:
+        if not enabled:
+            continue
+        panel = _draw_contour_layer(frame, layer_contours.get(key, []), label, color)
+        cv2.imshow(win_title, _resize_for_display(panel))
+
+    if DEBUG_SHOW_FINAL_DETECTION:
+        final_panel = _draw_projectile_detections(frame, detections, (0, 255, 0))
+        cv2.putText(final_panel, f"Final projectile: {len(detections)}",
+                    (6, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+        cv2.imshow("Debug: final projectile", _resize_for_display(final_panel))
 
 
 def _draw_tracks(frame        : np.ndarray,
@@ -196,7 +370,7 @@ def _draw_tracks(frame        : np.ndarray,
         if t.get("suspect_innovation"):
             label += " G"
             
-        if ENABLE_TRAJECTORY and val is not None:
+        if TRAJECTORY_ACTIVE and val is not None:
             if not val.is_ready():
                 label += " ..."
             else:
@@ -227,7 +401,7 @@ def _draw_tracks(frame        : np.ndarray,
         cv2.circle(out, (cx, cy), 3, color, -1)
 
         # Fitted parabola arc (only for projectile tracks)
-        if cls == "projectile" and ENABLE_TRAJECTORY and val is not None and val.is_valid():
+        if cls == "projectile" and TRAJECTORY_ACTIVE and val is not None and val.is_valid():
             arc = val.get_fitted_points()
             if arc and len(arc) > 1:
                 h_img, w_img = out.shape[:2]
@@ -257,7 +431,7 @@ def _draw_hud(frame         : np.ndarray,
                     cv2.FONT_HERSHEY_SIMPLEX, 0.36, (80, 200, 80), 1)
 
     hud_text = f"frame={frame_idx}  tracks={n_tracks}  dets={n_dets}"
-    if ENABLE_CLASSIFIER:
+    if CLASSIFIER_ACTIVE or TEMP_DISABLE_TRACKING:
         hud_text += f"  projectiles={n_projectiles}"
     cv2.putText(frame, hud_text,
                 (6, 18),
@@ -345,11 +519,14 @@ def main():
     print(f"    Mask combine   : {MASK_COMBINE_MODE}")
     print(f"    Morph clean    : {'ON' if ENABLE_MORPH_CLEAN else 'OFF'}  kernel={MORPH_KERNEL_SIZE}")
     print(f"    Blob filter    : {'ON' if ENABLE_BLOB_FILTER else 'OFF'}")
-    print(f"    Kalman tracker : {'ON' if ENABLE_KALMAN     else 'OFF'}")
-    print(f"    Trail          : {'ON' if ENABLE_TRAIL      else 'OFF'}  length={TRAIL_LENGTH}")
-    print(f"    Trajectory     : {'ON' if ENABLE_TRAJECTORY else 'OFF'}")
-    print(f"    Classifier     : {'ON' if ENABLE_CLASSIFIER else 'OFF'}")
+    kalman_state = "OFF (temp disabled)" if TEMP_DISABLE_TRACKING and ENABLE_KALMAN else ("ON" if TRACKING_ACTIVE else "OFF")
+    print(f"    Kalman tracker : {kalman_state}")
+    print(f"    Trail          : {'ON' if TRAIL_ACTIVE else 'OFF'}  length={TRAIL_LENGTH}")
+    print(f"    Trajectory     : {'ON' if TRAJECTORY_ACTIVE else 'OFF'}")
+    print(f"    Classifier     : {'ON' if CLASSIFIER_ACTIVE else 'OFF'}")
     print(f"    Debug view     : {'ON' if ENABLE_DEBUG_VIEW else 'OFF'}")
+    if TEMP_DISABLE_TRACKING:
+        print(f"    Mode           : tracking bypass (no IDs on screen)")
     print(f"\n  Press Q or ESC to quit.")
     print(f"  Press SPACE to pause / resume.")
     print(f"  Press S to save a screenshot.")
@@ -363,10 +540,10 @@ def main():
                   )
 
     tracker     = KalmanTracker(KALMAN_MAX_DISTANCE, KALMAN_MAX_MISSING) \
-                  if ENABLE_KALMAN else None
+                  if TRACKING_ACTIVE else None
 
     trail_store = TrailStore(TRAIL_LENGTH) \
-                  if ENABLE_TRAIL else TrailStore(0)
+                  if TRAIL_ACTIVE else TrailStore(0)
 
     classifier  = TrackClassifier(
                       min_age=CLASSIFIER_MIN_AGE,
@@ -376,7 +553,7 @@ def main():
                       min_path_efficiency=CLASSIFIER_MIN_PATH_EFFICIENCY,
                       min_spatial_spread=CLASSIFIER_MIN_SPATIAL_SPREAD,
                       min_direction_ratio=CLASSIFIER_MIN_DIRECTION_RATIO,
-                  ) if ENABLE_CLASSIFIER else None
+                  ) if CLASSIFIER_ACTIVE else None
 
     # Trajectory validators — one created per track ID on demand
     validators: dict = {}
@@ -440,12 +617,16 @@ def main():
         contours = detect_contours(cleaned)
 
         # ── Stage 9: Blob filtering ───────────────────────────────────
+        layer_contours = None
         if ENABLE_BLOB_FILTER:
-            detections = filter_blobs(
-                contours,
-                MIN_BLOB_AREA, MAX_BLOB_AREA,
-                MIN_CIRCULARITY, MIN_SOLIDITY, MAX_ASPECT_RATIO,
-            )
+            if debug_on and _wants_filter_layer_debug():
+                detections, layer_contours = _filter_blobs_with_layers(contours)
+            else:
+                detections = filter_blobs(
+                    contours,
+                    MIN_BLOB_AREA, MAX_BLOB_AREA,
+                    MIN_CIRCULARITY, MIN_SOLIDITY, MAX_ASPECT_RATIO,
+                )
         else:
             # Skip shape filtering — pass all contours as raw detections
             detections = []
@@ -456,16 +637,30 @@ def main():
                     "center": (x + w // 2, y + h // 2),
                     "area"  : cv2.contourArea(cnt),
                 })
+            if debug_on and _wants_filter_layer_debug():
+                layer_contours = {
+                    "contours": contours,
+                    "area": contours,
+                    "aspect": contours,
+                    "circularity": contours,
+                    "solidity": contours,
+                }
+
+        # ── Stage 9b: Isolation filter ─────────────────────────────────
+        if ENABLE_ISOLATION_FILTER:
+            detections = reject_clustered_blobs(
+                detections,
+                radius           = ISOLATION_RADIUS,
+                min_cluster_size = ISOLATION_MIN_CLUSTER,
+            )
 
         # ── Stage 10: Kalman tracking ─────────────────────────────────
         if tracker is not None:
             tracks = tracker.update(detections)
         else:
-            tracks = [
-                {"id": i, "center": d["center"], "bbox": d["bbox"],
-                 "velocity": (0, 0), "missing": 0, "age": 1, "det": d}
-                for i, d in enumerate(detections)
-            ]
+            tracks = []
+
+        draw_detections = detections
 
         # ── Stage 10.5: Scale coordinates back to full-res ─────────────
         if PROCESS_SCALE < 1.0:
@@ -476,12 +671,14 @@ def main():
                 x, y, w, h = t["bbox"]
                 t["bbox"] = (int(x * inv), int(y * inv),
                              int(w * inv), int(h * inv))
+            draw_detections = _scale_detections(detections, inv)
 
         # ── Stage 11: Trail storage ───────────────────────────────────
-        trail_store.update(tracks)
+        if TRAIL_ACTIVE:
+            trail_store.update(tracks)
 
         # ── Stage 12: Trajectory validation ──────────────────────────
-        if ENABLE_TRAJECTORY:
+        if TRAJECTORY_ACTIVE:
             active_ids = {t["id"] for t in tracks}
 
             # Remove validators for tracks that have been deleted
@@ -507,7 +704,10 @@ def main():
             classifier.update(tracks, trail_store, validators)
 
         # Count projectiles for HUD
-        n_projectiles = 0
+        projectile_detections = _select_primary_projectile(draw_detections) \
+            if TEMP_DISABLE_TRACKING else draw_detections
+
+        n_projectiles = len(projectile_detections) if TEMP_DISABLE_TRACKING else 0
         if classifier is not None:
             n_projectiles = sum(
                 1 for t in tracks if classifier.get(t["id"]) == "projectile"
@@ -522,14 +722,20 @@ def main():
             alarm_counter = max(0, alarm_counter - 1)
 
         # ── Stage 13: Draw ────────────────────────────────────────────
-        output = _draw_tracks(
-            display_frame, tracks, trail_store, validators,
-            classifier=classifier,
-            show_trail=ENABLE_TRAIL
-        )
+        if TRACKING_ACTIVE:
+            output = _draw_tracks(
+                display_frame, tracks, trail_store, validators,
+                classifier=classifier,
+                show_trail=TRAIL_ACTIVE
+            )
+            hud_tracks = len(tracks)
+        else:
+            output = _draw_projectile_detections(display_frame, projectile_detections)
+            hud_tracks = 0
+
         output = _draw_hud(
             output, frame_idx,
-            len(tracks), len(detections),
+            hud_tracks, len(draw_detections),
             n_projectiles,
             bgs.is_warmed_up
         )
@@ -543,7 +749,10 @@ def main():
                 "combined"  : combined,
                 "cleaned"   : cleaned,
             })
-
+            debug_final = _select_primary_projectile(detections) \
+                if TEMP_DISABLE_TRACKING else detections
+            _show_filter_layers(roi_frame, layer_contours, debug_final)
+            
         # ── Stage 15: Alarm overlay ───────────────────────────────────
         if alarm_counter > 0:
             fade = alarm_counter / ALARM_HOLD_FRAMES
@@ -574,9 +783,7 @@ def main():
         elif key == ord("d"):
             debug_on = not debug_on
             if not debug_on:
-                for title in ["Debug: top-hat", "Debug: frame diff",
-                               "Debug: MOG2", "Debug: combined",
-                               "Debug: cleaned"]:
+                for title in DEBUG_WINDOWS:
                     try:
                         cv2.destroyWindow(title)
                     except Exception:

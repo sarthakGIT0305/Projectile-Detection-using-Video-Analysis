@@ -2,7 +2,6 @@
 # tracking/kalman_tracker.py
 # =============================================================================
 # Multi-object Kalman-filter tracker with Hungarian (optimal) assignment.
-#
 # HOW IT WORKS — THREE STEPS EVERY FRAME
 # ----------------------------------------
 # 1. PREDICT  — each existing track runs its Kalman filter forward one time
