@@ -9,7 +9,7 @@ import cv2
 # -----------------------------------------------------------------------------
 # VIDEO
 # -----------------------------------------------------------------------------
-VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\20260408_04.mp4" 
+VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\20260408_05.mp4" 
 
 # -----------------------------------------------------------------------------
 # FEATURE FLAGS
@@ -25,9 +25,9 @@ ENABLE_BG_SUB       = True    # MOG2 background subtraction
 ENABLE_MORPH_CLEAN  = True    # morphological denoising of combined mask
 ENABLE_BLOB_FILTER  = True    # area / circularity / solidity blob filter
 ENABLE_TRAJECTORY   = False   # DISABLED — focus on raw detection first
-ENABLE_KALMAN       = False   # DISABLED — no tracking, no IDs
-ENABLE_TRAIL        = False   # DISABLED — no trails
-ENABLE_CLASSIFIER   = False   # DISABLED — no classification
+ENABLE_KALMAN       = 1 # Kalman tracking with IDs
+ENABLE_TRAIL        = 1   # trajectory trails
+ENABLE_CLASSIFIER   = 0   # classification off for now
 ENABLE_DEBUG_VIEW   = True    # show intermediate mask windows while running
 TEMP_DISABLE_TRACKING = False  # not needed — use proper flags above
 
@@ -137,19 +137,19 @@ ENABLE_ISOLATION_FILTER  = True
 # At 50m the ball is ~6–8px wide, so start at 30–40px.
 # Raise if clustered noise still passes. Lower if the ball itself
 # is being rejected (it should never have neighbours this close).
-ISOLATION_RADIUS         = 35
+ISOLATION_RADIUS         = 150
 
 # Minimum number of blobs in a neighbourhood to trigger rejection.
 # 2 = reject any blob that has even one neighbour (very strict).
 # 3 = reject only when 3 or more blobs are near each other (recommended).
 # The ball will never have neighbours, so 2 is safe but start at 3.
-ISOLATION_MIN_CLUSTER    = 3
+ISOLATION_MIN_CLUSTER    = 5
 
 # -----------------------------------------------------------------------------
 # TRAJECTORY VALIDATION  (detection/trajectory_fit.py)
 # -----------------------------------------------------------------------------
-TRAJECTORY_MIN_POINTS   = 4
-TRAJECTORY_MAX_RESIDUAL = 30.0
+TRAJECTORY_MIN_POINTS   = 5
+TRAJECTORY_MAX_RESIDUAL = 50.0
 
 # Velocity profile analysis thresholds (inactive when ENABLE_VELOCITY_CHECK=False)
 VELOCITY_DX_MAX_VARIANCE     = 100.0
@@ -158,7 +158,7 @@ VELOCITY_MAX_DIRECTION_FLIPS = 1
 
 # Trajectory shape descriptor thresholds (inactive when ENABLE_SHAPE_DESCRIPTORS=False)
 TRAJECTORY_MAX_ARC_RATIO    = 2.5
-TRAJECTORY_MAX_APEX_COUNT   = 3
+TRAJECTORY_MAX_APEX_COUNT   = 5
 TRAJECTORY_MAX_SPEED_JITTER = 90.0
 
 # -----------------------------------------------------------------------------
@@ -189,6 +189,19 @@ CLASSIFIER_SHOW_NOISE          = True
 # TRAIL  (tracking/trail_store.py)
 # -----------------------------------------------------------------------------
 TRAIL_LENGTH = 60   # longer trail to see the full arc across the sky
+
+# -----------------------------------------------------------------------------
+# PROJECTILE ARC DETECTION
+# -----------------------------------------------------------------------------
+# Checks each track's trail for a big downward parabola (thrown ball).
+# A flag fires when a track's observed trail:
+#   1. Spans at least ARC_MIN_SPAN_RATIO of the frame width horizontally
+#   2. Fits a downward-opening parabola (positive 'a' in image coords)
+#   3. Has a parabola fit residual below ARC_MAX_RESIDUAL
+#   4. Has at least ARC_MIN_POINTS observed positions
+ARC_MIN_SPAN_RATIO = 0.3     # 30% of frame width minimum horizontal coverage
+ARC_MAX_RESIDUAL   = 15.0     # max mean pixel error for the parabola fit
+ARC_MIN_POINTS     = 8        # minimum observed trail points before checking
 
 # -----------------------------------------------------------------------------
 # DEBUG DISPLAY

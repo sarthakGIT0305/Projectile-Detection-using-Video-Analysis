@@ -45,6 +45,7 @@ from config import (
     ENABLE_TRAJECTORY, TRAJECTORY_MIN_POINTS, TRAJECTORY_MAX_RESIDUAL,
     ENABLE_KALMAN, KALMAN_MAX_DISTANCE, KALMAN_MAX_MISSING,
     ENABLE_TRAIL, TRAIL_LENGTH,
+    ARC_MIN_SPAN_RATIO, ARC_MAX_RESIDUAL, ARC_MIN_POINTS,
     ENABLE_CLASSIFIER,
     CLASSIFIER_MIN_AGE, CLASSIFIER_MIN_DISPLACEMENT,
     CLASSIFIER_MIN_SPEED, CLASSIFIER_MAX_SPEED,
@@ -340,6 +341,10 @@ def _draw_tracks(frame        : np.ndarray,
         x, y, w, h = t["bbox"]
         miss       = t["missing"]
 
+        # Only draw tracks matched to a real detection this frame
+        if miss > 0:
+            continue
+
         # Determine classification
         cls = classifier.get(tid) if classifier is not None else "projectile"
 
@@ -490,6 +495,61 @@ def _draw_alarm(frame: np.ndarray, active: bool, fade: float = 1.0) -> np.ndarra
     return frame
 
 
+# ── Projectile arc detector ──────────────────────────────────────────────────
+
+def _check_projectile_arc(trail_store, tracks, frame_width):
+    """Check each track's trail for a big downward parabola.
+
+    Returns a tuple (flagged_ids, arcs):
+      - flagged_ids: set of track IDs that look like a thrown ball
+      - arcs: dict mapping track ID to a list of (x,y) points for the smooth fitted arc
+    """
+    flagged = set()
+    arcs = {}
+    min_span = frame_width * ARC_MIN_SPAN_RATIO
+
+    for t in tracks:
+        tid = t["id"]
+        pts = trail_store.get_observed_points(tid)
+        if len(pts) < ARC_MIN_POINTS:
+            continue
+
+        xs = np.array([p[0] for p in pts], dtype=np.float64)
+        ys = np.array([p[1] for p in pts], dtype=np.float64)
+
+        # Check horizontal span
+        x_span = xs.max() - xs.min()
+        if x_span < min_span:
+            continue
+
+        # Fit parabola: y = a*x^2 + b*x + c
+        try:
+            coeffs = np.polyfit(xs, ys, deg=2)
+        except (np.linalg.LinAlgError, ValueError):
+            continue
+
+        a = coeffs[0]
+
+        if a <= 0:
+            continue
+
+        # Check fit quality
+        y_pred = np.polyval(coeffs, xs)
+        residual = float(np.mean(np.abs(ys - y_pred)))
+        if residual > ARC_MAX_RESIDUAL:
+            continue
+
+        flagged.add(tid)
+        
+        # Save a smooth fitted arc for drawing permanently
+        x_min, x_max = xs.min(), xs.max()
+        x_range = np.linspace(x_min, x_max, 100)
+        y_range = np.polyval(coeffs, x_range)
+        arcs[tid] = [(int(x), int(y)) for x, y in zip(x_range, y_range)]
+
+    return flagged, arcs
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -557,6 +617,7 @@ def main():
 
     # Trajectory validators — one created per track ID on demand
     validators: dict = {}
+    saved_projectile_arcs = {}  # permanently saves arcs of detected projectiles
 
     paused       = False
     frame_idx    = 0
@@ -713,10 +774,22 @@ def main():
                 1 for t in tracks if classifier.get(t["id"]) == "projectile"
             )
 
+        # ── Projectile arc check ──────────────────────────────────────
+        arc_ids = set()
+        if TRAIL_ACTIVE and TRACKING_ACTIVE:
+            arc_ids, new_arcs = _check_projectile_arc(
+                trail_store, tracks, display_frame.shape[1]
+            )
+            if arc_ids:
+                n_projectiles = len(arc_ids)
+                # Permanently save these winning arcs
+                for tid, pts in new_arcs.items():
+                    saved_projectile_arcs[tid] = pts
+
         # ── Alarm logic ───────────────────────────────────────────────
         if n_projectiles > 0:
             if alarm_counter == 0:
-                print(f"  ⚠ PROJECTILE DETECTED at frame {frame_idx}!")
+                print(f"  [!] PROJECTILE DETECTED at frame {frame_idx}!")
             alarm_counter = ALARM_HOLD_FRAMES
         else:
             alarm_counter = max(0, alarm_counter - 1)
@@ -732,6 +805,16 @@ def main():
         else:
             output = _draw_projectile_detections(display_frame, projectile_detections)
             hud_tracks = 0
+
+        # Draw the permanent projectile arcs boldly!
+        for tid, arc_pts in saved_projectile_arcs.items():
+            color = (0, 0, 0) # Black color for arc
+            h_img, w_img = output.shape[:2]
+            # Draw every 3rd point as a filled circle to create a bold dotted line effect
+            for i in range(0, len(arc_pts), 3):
+                p = arc_pts[i]
+                if 0 <= p[0] < w_img and 0 <= p[1] < h_img:
+                    cv2.circle(output, p, 10, color, -1) # Radius 5 = very bold dots
 
         output = _draw_hud(
             output, frame_idx,
