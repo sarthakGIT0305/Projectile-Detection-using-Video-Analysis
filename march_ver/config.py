@@ -9,7 +9,7 @@ import cv2
 # -----------------------------------------------------------------------------
 # VIDEO
 # -----------------------------------------------------------------------------
-VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\20260408_05.mp4" 
+VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\20260408_26.mp4" 
 
 # -----------------------------------------------------------------------------
 # FEATURE FLAGS
@@ -199,9 +199,13 @@ TRAIL_LENGTH = 60   # longer trail to see the full arc across the sky
 #   2. Fits a downward-opening parabola (positive 'a' in image coords)
 #   3. Has a parabola fit residual below ARC_MAX_RESIDUAL
 #   4. Has at least ARC_MIN_POINTS observed positions
-ARC_MIN_SPAN_RATIO = 0.3     # 30% of frame width minimum horizontal coverage
+ARC_MIN_SPAN_RATIO = 0.2     # 40% of frame width minimum horizontal coverage
 ARC_MAX_RESIDUAL   = 15.0     # max mean pixel error for the parabola fit
 ARC_MIN_POINTS     = 8        # minimum observed trail points before checking
+# Extrapolated red path stops this many pixels above the bottom of frame.
+# 0  => extend to very bottom edge
+# 80 => stop 80 px above bottom
+EXTRAPOLATION_STOP_FROM_BOTTOM_PX = 350
 
 # -----------------------------------------------------------------------------
 # DEBUG DISPLAY
@@ -291,6 +295,7 @@ if __name__ == "__main__":
         "TRAJECTORY_MAX_APEX_COUNT": TRAJECTORY_MAX_APEX_COUNT,
         "TRAJECTORY_MAX_SPEED_JITTER": TRAJECTORY_MAX_SPEED_JITTER,
         "TRAIL_LENGTH"         : TRAIL_LENGTH,
+        "EXTRAPOLATION_STOP_FROM_BOTTOM_PX": EXTRAPOLATION_STOP_FROM_BOTTOM_PX,
     }
 
     print("\n" + "="*52)
@@ -316,6 +321,7 @@ if __name__ == "__main__":
         (MORPH_KERNEL_SIZE[0] <= 3,            "MORPH_KERNEL_SIZE should be <= (3,3) for tiny objects"),
         (TOPHAT_KERNEL_SIZE[0] > MORPH_KERNEL_SIZE[0], "TOPHAT kernel should be larger than MORPH kernel"),
         (FRAME_DIFF_GAP >= 1,                  "FRAME_DIFF_GAP must be >= 1"),
+        (EXTRAPOLATION_STOP_FROM_BOTTOM_PX >= 0, "EXTRAPOLATION_STOP_FROM_BOTTOM_PX must be >= 0"),
         (MASK_COMBINE_MODE in ("or","and","tophat_and_any","motion_primary"), "MASK_COMBINE_MODE must be or/and/tophat_and_any/motion_primary"),
     ]
     all_ok = True

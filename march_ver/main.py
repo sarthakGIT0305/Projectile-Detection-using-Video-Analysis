@@ -46,6 +46,7 @@ from config import (
     ENABLE_KALMAN, KALMAN_MAX_DISTANCE, KALMAN_MAX_MISSING,
     ENABLE_TRAIL, TRAIL_LENGTH,
     ARC_MIN_SPAN_RATIO, ARC_MAX_RESIDUAL, ARC_MIN_POINTS,
+    EXTRAPOLATION_STOP_FROM_BOTTOM_PX,
     ENABLE_CLASSIFIER,
     CLASSIFIER_MIN_AGE, CLASSIFIER_MIN_DISPLACEMENT,
     CLASSIFIER_MIN_SPEED, CLASSIFIER_MAX_SPEED,
@@ -85,6 +86,9 @@ TRACK_COLORS = [
     (0,255,0), (0,200,255), (255,100,0), (200,0,255),
     (0,255,200), (255,255,0), (100,100,255), (255,0,100),
 ]
+COLOR_PROJECTILE_ARC = (92, 230, 92)     # black
+COLOR_EXTRAPOLATION = (44, 44, 255)    # red
+FINAL_WINDOW_TITLE = "Ball Detector"
 
 TRACKING_ACTIVE   = ENABLE_KALMAN and not TEMP_DISABLE_TRACKING
 TRAJECTORY_ACTIVE = ENABLE_TRAJECTORY and TRACKING_ACTIVE
@@ -238,9 +242,7 @@ def _draw_projectile_detections(frame: np.ndarray,
     out = frame.copy()
     for det in detections:
         x, y, w, h = det["bbox"]
-        cx, cy = det["center"]
         cv2.rectangle(out, (x, y), (x + w, y + h), color, 2)
-        cv2.circle(out, (cx, cy), 3, color, -1)
     return out
 
 
@@ -337,7 +339,6 @@ def _draw_tracks(frame        : np.ndarray,
 
     for t in tracks:
         tid        = t["id"]
-        cx, cy     = t["center"]
         x, y, w, h = t["bbox"]
         miss       = t["missing"]
 
@@ -366,44 +367,7 @@ def _draw_tracks(frame        : np.ndarray,
         box_color = tuple(int(c * 0.45) for c in color) if miss > 0 else color
         cv2.rectangle(out, (x, y), (x + w, y + h), box_color, 1)
 
-        # Build label
         val = validators.get(tid)
-        label = f"ID:{tid}"
-        if miss > 0:
-            label += f" P{miss}"
-            
-        if t.get("suspect_innovation"):
-            label += " G"
-            
-        if TRAJECTORY_ACTIVE and val is not None:
-            if not val.is_ready():
-                label += " ..."
-            else:
-                fails = []
-                info = val.get_info()
-                if info.get("residual") is not None and info["residual"] > val.max_residual:
-                    fails.append("R")
-                if hasattr(val, '_vel_validator') and not val._vel_validator.is_valid():
-                    fails.append("V")
-                if hasattr(val, '_check_shape_descriptors') and not val._check_shape_descriptors():
-                    fails.append("S")
-                
-                if not fails and val.is_valid():
-                    label += " OK"
-                elif fails:
-                    label += f" {''.join(fails)}"
-                else:
-                    label += " ?"
-        # Classification indicator
-        if cls == "noise":
-            label += " X"
-        elif cls == "pending":
-            label += " ~"
-
-        cv2.putText(out, label,
-                    (x, max(y - 3, 10)),
-                    FONT_FACE, FONT_SCALE, color, FONT_THICKNESS)
-        cv2.circle(out, (cx, cy), 3, color, -1)
 
         # Fitted parabola arc (only for projectile tracks)
         if cls == "projectile" and TRAJECTORY_ACTIVE and val is not None and val.is_valid():
@@ -444,7 +408,7 @@ def _draw_hud(frame         : np.ndarray,
 
     # Key hint
     cv2.putText(frame,
-                "SPACE=pause  S=screenshot  D=debug  Q=quit",
+                "SPACE=pause  S=screenshot  Q=quit",
                 (6, 36),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.35, (160, 160, 160), 1)
 
@@ -497,15 +461,91 @@ def _draw_alarm(frame: np.ndarray, active: bool, fade: float = 1.0) -> np.ndarra
 
 # ── Projectile arc detector ──────────────────────────────────────────────────
 
-def _check_projectile_arc(trail_store, tracks, frame_width):
+def _build_extrapolated_path(coeffs: np.ndarray,
+                             observed_pts: list[tuple[int, int]],
+                             frame_width: int,
+                             frame_height: int) -> list[tuple[int, int]]:
+    """Build forward-only parabola extrapolation toward predicted landing."""
+    if len(observed_pts) < 2:
+        return []
+
+    a, b, c = [float(v) for v in coeffs]
+    x_first = float(observed_pts[0][0])
+    x_last = float(observed_pts[-1][0])
+
+    direction = 1.0 if (x_last - x_first) >= 0 else -1.0
+    if abs(x_last - x_first) < 1e-6:
+        slope_now = (2.0 * a * x_last) + b
+        direction = 1.0 if slope_now >= 0 else -1.0
+
+    y_limit = float(
+        np.clip(
+            (frame_height - 1) - int(max(0, EXTRAPOLATION_STOP_FROM_BOTTOM_PX)),
+            0,
+            frame_height - 1,
+        )
+    )
+    landing_x = None
+    disc = (b * b) - (4.0 * a * (c - y_limit))
+    if disc >= 0.0:
+        sqrt_disc = float(np.sqrt(disc))
+        roots = [
+            (-b + sqrt_disc) / (2.0 * a),
+            (-b - sqrt_disc) / (2.0 * a),
+        ]
+        forward_roots = []
+        for r in roots:
+            if direction > 0 and r > (x_last + 1.0):
+                forward_roots.append(r)
+            if direction < 0 and r < (x_last - 1.0):
+                forward_roots.append(r)
+        if forward_roots:
+            landing_x = min(forward_roots) if direction > 0 else max(forward_roots)
+
+    if landing_x is None:
+        x_target = float(frame_width - 1 if direction > 0 else 0)
+    else:
+        x_target = float(np.clip(landing_x, 0, frame_width - 1))
+
+    if abs(x_target - x_last) < 1.0:
+        return []
+
+    n_samples = max(24, int(abs(x_target - x_last) * 1.5))
+    x_values = np.linspace(x_last, x_target, n_samples)
+    y_values = np.polyval(coeffs, x_values)
+
+    path = []
+    for x, y in zip(x_values, y_values):
+        xi = int(round(x))
+        yi = int(round(y))
+        if 0 <= xi < frame_width and 0 <= yi < frame_height:
+            if not path or path[-1] != (xi, yi):
+                path.append((xi, yi))
+
+    if landing_x is not None and 0 <= landing_x <= (frame_width - 1):
+        landing_pt = (int(round(landing_x)), int(round(y_limit)))
+        if not path or path[-1] != landing_pt:
+            path.append(landing_pt)
+
+    # Keep extrapolation sample density close to the black fitted-arc style.
+    if len(path) > 100:
+        sample_idx = np.linspace(0, len(path) - 1, 100, dtype=np.int32)
+        path = [path[i] for i in sample_idx]
+
+    return path
+
+
+def _check_projectile_arc(trail_store, tracks, frame_width, frame_height):
     """Check each track's trail for a big downward parabola.
 
-    Returns a tuple (flagged_ids, arcs):
+    Returns a tuple (flagged_ids, arcs, extrapolations):
       - flagged_ids: set of track IDs that look like a thrown ball
       - arcs: dict mapping track ID to a list of (x,y) points for the smooth fitted arc
+      - extrapolations: dict mapping track ID to a list of (x,y) predicted points
     """
     flagged = set()
     arcs = {}
+    extrapolations = {}
     min_span = frame_width * ARC_MIN_SPAN_RATIO
 
     for t in tracks:
@@ -547,7 +587,11 @@ def _check_projectile_arc(trail_store, tracks, frame_width):
         y_range = np.polyval(coeffs, x_range)
         arcs[tid] = [(int(x), int(y)) for x, y in zip(x_range, y_range)]
 
-    return flagged, arcs
+        predicted = _build_extrapolated_path(coeffs, pts, frame_width, frame_height)
+        if predicted:
+            extrapolations[tid] = predicted
+
+    return flagged, arcs, extrapolations
 
 
 # =============================================================================
@@ -617,13 +661,32 @@ def main():
 
     # Trajectory validators — one created per track ID on demand
     validators: dict = {}
-    saved_projectile_arcs = {}  # permanently saves arcs of detected projectiles
+    saved_projectile_arcs = {}             # permanently saves arcs of detected projectiles
+    saved_projectile_predictions = {}      # permanently saves extrapolated landing paths
 
     paused       = False
     frame_idx    = 0
     screenshot_n = 0
-    debug_on     = ENABLE_DEBUG_VIEW
+    debug_on     = False
     alarm_counter = 0
+
+    # Final-output-only window in fullscreen.
+    cv2.namedWindow(FINAL_WINDOW_TITLE, cv2.WINDOW_NORMAL)
+    try:
+        cv2.setWindowProperty(
+            FINAL_WINDOW_TITLE,
+            cv2.WND_PROP_FULLSCREEN,
+            cv2.WINDOW_FULLSCREEN
+        )
+    except Exception:
+        pass
+
+    # Ensure debug windows are closed and stay disabled.
+    for title in DEBUG_WINDOWS:
+        try:
+            cv2.destroyWindow(title)
+        except Exception:
+            pass
 
     # ── Main loop ─────────────────────────────────────────────────────
     for frame in reader.frames():
@@ -777,14 +840,18 @@ def main():
         # ── Projectile arc check ──────────────────────────────────────
         arc_ids = set()
         if TRAIL_ACTIVE and TRACKING_ACTIVE:
-            arc_ids, new_arcs = _check_projectile_arc(
-                trail_store, tracks, display_frame.shape[1]
+            arc_ids, new_arcs, new_predictions = _check_projectile_arc(
+                trail_store, tracks,
+                display_frame.shape[1],
+                display_frame.shape[0],
             )
             if arc_ids:
                 n_projectiles = len(arc_ids)
                 # Permanently save these winning arcs
                 for tid, pts in new_arcs.items():
                     saved_projectile_arcs[tid] = pts
+                for tid, pts in new_predictions.items():
+                    saved_projectile_predictions[tid] = pts
 
         # ── Alarm logic ───────────────────────────────────────────────
         if n_projectiles > 0:
@@ -799,22 +866,34 @@ def main():
             output = _draw_tracks(
                 display_frame, tracks, trail_store, validators,
                 classifier=classifier,
-                show_trail=TRAIL_ACTIVE
+                # Keep trail storage for arc detection, but hide temporary/live trail rendering.
+                show_trail=False
             )
             hud_tracks = len(tracks)
         else:
             output = _draw_projectile_detections(display_frame, projectile_detections)
             hud_tracks = 0
 
-        # Draw the permanent projectile arcs boldly!
+        # Draw permanent projectile paths (line-only: no dots).
         for tid, arc_pts in saved_projectile_arcs.items():
-            color = (0, 0, 0) # Black color for arc
+            color = COLOR_PROJECTILE_ARC
             h_img, w_img = output.shape[:2]
-            # Draw every 3rd point as a filled circle to create a bold dotted line effect
-            for i in range(0, len(arc_pts), 3):
-                p = arc_pts[i]
-                if 0 <= p[0] < w_img and 0 <= p[1] < h_img:
-                    cv2.circle(output, p, 10, color, -1) # Radius 5 = very bold dots
+            if len(arc_pts) > 1:
+                for i in range(1, len(arc_pts)):
+                    p1 = arc_pts[i - 1]
+                    p2 = arc_pts[i]
+                    if (0 <= p1[0] < w_img and 0 <= p1[1] < h_img and
+                            0 <= p2[0] < w_img and 0 <= p2[1] < h_img):
+                        cv2.line(output, p1, p2, color, 5)
+
+            predicted_pts = saved_projectile_predictions.get(tid, [])
+            if len(predicted_pts) > 1:
+                for i in range(1, len(predicted_pts)):
+                    p1 = predicted_pts[i - 1]
+                    p2 = predicted_pts[i]
+                    if (0 <= p1[0] < w_img and 0 <= p1[1] < h_img and
+                            0 <= p2[0] < w_img and 0 <= p2[1] < h_img):
+                        cv2.line(output, p1, p2, COLOR_EXTRAPOLATION, 5)
 
         output = _draw_hud(
             output, frame_idx,
@@ -842,8 +921,7 @@ def main():
             output = _draw_alarm(output, n_projectiles > 0, fade)
 
         # ── Stage 16: Display ─────────────────────────────────────────
-        display = _resize_for_display(output)
-        cv2.imshow("Ball Detector  —  Q to quit", display)
+        cv2.imshow(FINAL_WINDOW_TITLE, output)
 
         # ── Key handling ──────────────────────────────────────────────
         wait = 0 if paused else 1
@@ -864,14 +942,7 @@ def main():
             print(f"  Screenshot saved: {fname}")
 
         elif key == ord("d"):
-            debug_on = not debug_on
-            if not debug_on:
-                for title in DEBUG_WINDOWS:
-                    try:
-                        cv2.destroyWindow(title)
-                    except Exception:
-                        pass
-            print(f"  Debug view {'ON' if debug_on else 'OFF'}.")
+            print("  Debug windows are disabled (final-output-only mode).")
 
         # When paused, hold until space or q
         if paused:
