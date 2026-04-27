@@ -379,7 +379,6 @@ def _draw_tracks(frame        : np.ndarray,
                     if (0 <= p1[0] < w_img and 0 <= p1[1] < h_img and
                             0 <= p2[0] < w_img and 0 <= p2[1] < h_img):
                         cv2.line(out, p1, p2, color, 1)
-
     return out
 
 
@@ -670,14 +669,14 @@ def main():
     debug_on     = False
     alarm_counter = 0
 
-    # Final-output-only window in fullscreen.
+    # Final-output-only window at 75% screen size.
     cv2.namedWindow(FINAL_WINDOW_TITLE, cv2.WINDOW_NORMAL)
     try:
-        cv2.setWindowProperty(
-            FINAL_WINDOW_TITLE,
-            cv2.WND_PROP_FULLSCREEN,
-            cv2.WINDOW_FULLSCREEN
-        )
+        import ctypes
+        user32 = ctypes.windll.user32
+        sw = user32.GetSystemMetrics(0)
+        sh = user32.GetSystemMetrics(1)
+        cv2.resizeWindow(FINAL_WINDOW_TITLE, int(sw * 0.75), int(sh * 0.75))
     except Exception:
         pass
 

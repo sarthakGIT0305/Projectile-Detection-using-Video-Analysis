@@ -9,7 +9,7 @@ import cv2
 # -----------------------------------------------------------------------------
 # VIDEO
 # -----------------------------------------------------------------------------
-VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\20260408_26.mp4" 
+VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\20260408_24.mp4" 
 
 # -----------------------------------------------------------------------------
 # FEATURE FLAGS
@@ -205,7 +205,7 @@ ARC_MIN_POINTS     = 8        # minimum observed trail points before checking
 # Extrapolated red path stops this many pixels above the bottom of frame.
 # 0  => extend to very bottom edge
 # 80 => stop 80 px above bottom
-EXTRAPOLATION_STOP_FROM_BOTTOM_PX = 350
+EXTRAPOLATION_STOP_FROM_BOTTOM_PX = 400
 
 # -----------------------------------------------------------------------------
 # DEBUG DISPLAY
