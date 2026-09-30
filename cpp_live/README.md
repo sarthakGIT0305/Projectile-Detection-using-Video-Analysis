@@ -24,6 +24,8 @@ ctest --test-dir build --output-on-failure -C Release
 build\Release\projectile_live.exe config\pipeline_default.ini
 ```
 
+From the repository root, the simplest Windows startup method is to double-click `run_projectile_live.bat`. It sets the MinGW64 runtime path, finds the executable, and starts the configured source. Edit `config/pipeline_default.ini` before running to choose a stored `video_path` or set `video_path=` and select a `camera_index`.
+
 The default configuration runs the prerecorded sample at `assets/50m-1.mp4`. Run the command from the repository root because `video_path` is relative to the current directory. Change `video_path` to `assets/50m-2.mp4`, `assets/50m-3.mp4`, or `assets/50m-4.mp4` to select another sample. To use a camera instead, set `video_path=` and choose the `camera_index`.
 
 Set `camera_index`, `width`, `height`, and `fps` in the INI file. Set `display=false` and `headless=true` for a machine without a GUI. Press `q` or Escape to stop the displayed application.
