@@ -30,7 +30,7 @@ from collections import deque
 class TrailStore:
     """Accumulates per-track position history for trail drawing."""
 
-    def __init__(self, max_length: int = 40):
+    def __init__(self, max_length: int = 50):
         self.max_length = max_length
         self._trails: Dict[int, deque] = {}
 
