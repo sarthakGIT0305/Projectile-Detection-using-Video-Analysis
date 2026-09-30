@@ -16,6 +16,7 @@ struct Config {
 	double kalman_max_distance = 80.0; int kalman_max_missing = 6; double kalman_max_innovation = 30.0; bool kalman_gravity = false; double gravity = .5;
 	int trail_length = 60; double arc_min_span_ratio = .2; double arc_max_residual = 15.0; int arc_min_points = 8; int extrapolation_stop = 400;
 	double process_scale = .75; int frame_skip = 1; int max_width = 1280; int max_height = 720; bool verbose_metrics = true;
+	double display_scale = 0.75;
 };
 
 Config load_config(const std::string& path, const Config& defaults = {});

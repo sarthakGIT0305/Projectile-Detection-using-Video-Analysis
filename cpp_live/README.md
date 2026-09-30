@@ -28,7 +28,7 @@ From the repository root, the simplest Windows startup method is to double-click
 
 The default configuration runs the prerecorded sample at `assets/50m-1.mp4`. Run the command from the repository root because `video_path` is relative to the current directory. Change `video_path` to `assets/50m-2.mp4`, `assets/50m-3.mp4`, or `assets/50m-4.mp4` to select another sample. To use a camera instead, set `video_path=` and choose the `camera_index`.
 
-Set `camera_index`, `width`, `height`, and `fps` in the INI file. Set `display=false` and `headless=true` for a machine without a GUI. Press `q` or Escape to stop the displayed application.
+Set `camera_index`, `width`, `height`, and `fps` in the INI file. Set `display_scale=0.75` to show the annotated output at 75% of the source dimensions; this does not change `process_scale` or detection behavior. Set `display=false` and `headless=true` for a machine without a GUI. Press `q` or Escape to stop the displayed application.
 
 The application reports captured, processed, dropped, and processing-FPS counters on shutdown. Live camera input uses a bounded latest-frame buffer with capacity one: when processing falls behind, old frames are discarded and the newest frame is retained. Prerecorded video uses the same bounded buffer with back-pressure, so playback waits for processing and does not skip frames.
 
