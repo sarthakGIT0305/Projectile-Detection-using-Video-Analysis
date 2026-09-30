@@ -9,7 +9,7 @@ import cv2
 # -----------------------------------------------------------------------------
 # VIDEO
 # -----------------------------------------------------------------------------
-VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\20260408_24.mp4" 
+VIDEO_PATH = r"D:\\Coding++\\web_dev_and_projects\\folderAssets\\open_cv_assets\\20260408_00.mp4" 
 
 # -----------------------------------------------------------------------------
 # FEATURE FLAGS

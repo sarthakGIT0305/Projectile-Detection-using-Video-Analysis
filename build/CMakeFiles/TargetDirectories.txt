@@ -1,0 +1,6 @@
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build/CMakeFiles/projectile_core.dir
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build/CMakeFiles/projectile_live.dir
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build/CMakeFiles/projectile_tests.dir
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build/CMakeFiles/test.dir
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build/CMakeFiles/edit_cache.dir
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,5 @@
+#include "projectile/preprocessor.hpp"
+#include <opencv2/imgproc.hpp>
+namespace projectile { std::pair<cv::Mat,cv::Point> Preprocessor::roi(const cv::Mat& f)const{if(!config_.enable_roi)return{f,{}};int w=std::max(1,int(f.cols*config_.roi_percent)),h=std::max(1,int(f.rows*config_.roi_percent));int x=std::clamp(int(f.cols*config_.roi_anchor_x-w/2),0,f.cols-w),y=std::clamp(int(f.rows*config_.roi_anchor_y-h/2),0,f.rows-h);return{f(cv::Rect(x,y,w,h)),{x,y}};}
+cv::Mat Preprocessor::gray(const cv::Mat& b)const{cv::Mat g;if(!config_.clahe){cv::cvtColor(b,g,cv::COLOR_BGR2GRAY);return g;}cv::Mat lab;cv::cvtColor(b,lab,cv::COLOR_BGR2Lab);std::vector<cv::Mat> c;cv::split(lab,c);cv::createCLAHE(config_.clahe_clip,{config_.clahe_tile,config_.clahe_tile})->apply(c[0],c[0]);cv::merge(c,lab);cv::Mat e;cv::cvtColor(lab,e,cv::COLOR_Lab2BGR);cv::cvtColor(e,g,cv::COLOR_BGR2GRAY);return g;}
+cv::Mat Preprocessor::scale(const cv::Mat& f)const{if(config_.process_scale==1)return f;cv::Mat o;cv::resize(f,o,{},config_.process_scale,config_.process_scale,cv::INTER_AREA);return o;}}
