@@ -208,7 +208,7 @@ class KalmanTracker:
             blob_filter.
 
         Returns
-        -------
+        ------- 
         list of _Track
             All currently active tracks (includes predicting ones).
         """

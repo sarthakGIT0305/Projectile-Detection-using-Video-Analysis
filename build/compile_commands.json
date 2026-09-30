@@ -1,0 +1,86 @@
+[
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\blob_detector.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\blob_detector.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/blob_detector.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/blob_detector.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\camera_capture.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\camera_capture.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/camera_capture.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/camera_capture.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\config.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\config.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/config.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/config.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\frame_buffer.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\frame_buffer.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/frame_buffer.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/frame_buffer.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\hungarian.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\hungarian.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/hungarian.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/hungarian.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\kalman_tracker.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\kalman_tracker.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/kalman_tracker.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/kalman_tracker.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\motion_detector.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\motion_detector.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/motion_detector.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/motion_detector.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\pipeline.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\pipeline.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/pipeline.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/pipeline.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\preprocessor.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\preprocessor.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/preprocessor.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/preprocessor.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\trail_store.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\trail_store.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/trail_store.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/trail_store.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\trajectory_analyzer.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\trajectory_analyzer.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/trajectory_analyzer.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/trajectory_analyzer.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_core.dir\\includes_CXX.rsp -g -std=gnu++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\projectile_core.dir\\src\\visualizer.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\visualizer.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/visualizer.cpp",
+  "output": "CMakeFiles/projectile_core.dir/src/visualizer.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_live.dir\\includes_CXX.rsp -g -std=gnu++17 -o CMakeFiles\\projectile_live.dir\\src\\main.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\src\\main.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/src/main.cpp",
+  "output": "CMakeFiles/projectile_live.dir/src/main.cpp.obj"
+},
+{
+  "directory": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles\\projectile_tests.dir\\includes_CXX.rsp -g -std=gnu++17 -o CMakeFiles\\projectile_tests.dir\\tests\\test_algorithms.cpp.obj -c D:\\Coding++\\web_dev_and_projects\\Projectile-Detection-using-Video-Analysis\\cpp_live\\tests\\test_algorithms.cpp",
+  "file": "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/tests/test_algorithms.cpp",
+  "output": "CMakeFiles/projectile_tests.dir/tests/test_algorithms.cpp.obj"
+}
+]

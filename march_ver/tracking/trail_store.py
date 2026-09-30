@@ -19,7 +19,7 @@
 # PARAMETERS (set in config.py):
 #   TRAIL_LENGTH — number of past positions kept per track
 #   COLOR_TRAIL  — BGR drawing colour for the observed trail
-# =============================================================================
+# ============================================================================
 
 import cv2
 import numpy as np
@@ -42,7 +42,7 @@ class TrailStore:
           update(track_id, cx, cy, observed) — from self-test / manual code
         """
         if isinstance(tracks_or_id, list):
-            # main.py style: list of track dicts
+            main.py style: list of track dicts
             active_ids = set()
             for t in tracks_or_id:
                 tid = t["id"]

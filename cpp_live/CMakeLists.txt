@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.16)
+project(projectile_live LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc highgui video videoio)
+add_library(projectile_core
+		src/blob_detector.cpp src/camera_capture.cpp src/config.cpp src/frame_buffer.cpp
+		src/hungarian.cpp src/kalman_tracker.cpp src/motion_detector.cpp src/pipeline.cpp
+		src/preprocessor.cpp src/trail_store.cpp src/trajectory_analyzer.cpp src/visualizer.cpp)
+target_include_directories(projectile_core PUBLIC include)
+target_link_libraries(projectile_core PUBLIC ${OpenCV_LIBS})
+if(MSVC)
+	target_compile_options(projectile_core PRIVATE /W4)
+else()
+	target_compile_options(projectile_core PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+add_executable(projectile_live src/main.cpp)
+target_link_libraries(projectile_live PRIVATE projectile_core)
+enable_testing()
+add_executable(projectile_tests tests/test_algorithms.cpp)
+target_link_libraries(projectile_tests PRIVATE projectile_core)
+add_test(NAME projectile_algorithms COMMAND projectile_tests)

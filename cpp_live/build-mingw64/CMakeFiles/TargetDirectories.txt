@@ -1,0 +1,6 @@
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/build-mingw64/CMakeFiles/projectile_core.dir
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/build-mingw64/CMakeFiles/projectile_live.dir
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/build-mingw64/CMakeFiles/projectile_tests.dir
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/build-mingw64/CMakeFiles/test.dir
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/build-mingw64/CMakeFiles/edit_cache.dir
+D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/build-mingw64/CMakeFiles/rebuild_cache.dir

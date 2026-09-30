@@ -1,0 +1,7 @@
+#include "projectile/trajectory_analyzer.hpp"
+#include <algorithm>
+#include <cmath>
+namespace projectile {
+static bool fit(const std::vector<cv::Point2f>& p,double& a,double& b,double& c,double& err){if(p.size()<3)return false;double s0=p.size(),s1=0,s2=0,s3=0,s4=0,t0=0,t1=0,t2=0;for(auto q:p){double x=q.x,y=q.y,x2=x*x;s1+=x;s2+=x2;s3+=x2*x;s4+=x2*x2;t0+=y;t1+=x*y;t2+=x2*y;}cv::Mat A=(cv::Mat_<double>(3,3)<<s4,s3,s2,s3,s2,s1,s2,s1,s0),Y=(cv::Mat_<double>(3,1)<<t2,t1,t0),X;if(!cv::solve(A,Y,X,cv::DECOMP_SVD))return false;a=X.at<double>(0);b=X.at<double>(1);c=X.at<double>(2);err=0;for(auto q:p)err+=std::abs(q.y-(a*q.x*q.x+b*q.x+c));err/=p.size();return std::isfinite(err);}
+std::unordered_map<int,ArcResult> TrajectoryAnalyzer::analyze(const TrailStore& ts,const std::vector<Track>& tracks,cv::Size size)const{std::unordered_map<int,ArcResult> out;for(auto&t:tracks){auto p=ts.observed(t.id);if(int(p.size())<config_.arc_min_points)continue;auto [mn,mx]=std::minmax_element(p.begin(),p.end(),[](auto&a,auto&b){return a.x<b.x;});if(mx->x-mn->x<config_.arc_min_span_ratio*size.width)continue;double a,b,c,e;if(!fit(p,a,b,c,e)||a<=0||e>config_.arc_max_residual)continue;ArcResult r;r.valid=true;r.residual=e;for(int i=0;i<100;++i){double x=mn->x+(mx->x-mn->x)*i/99.0;r.arc.push_back({int(x),int(a*x*x+b*x+c)});}double x=mx->x;int bottom=size.height-config_.extrapolation_stop;for(int i=0;i<100&&x<size.width;++i,x+=(size.width-mn->x)/100.0){double y=a*x*x+b*x+c;r.extrapolation.push_back({int(x),int(y)});if(y>=bottom)break;}out[t.id]=std::move(r);}return out;}
+}

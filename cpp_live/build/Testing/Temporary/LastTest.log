@@ -1,0 +1,19 @@
+Start testing: Sep 30 13:51 India Standard Time
+----------------------------------------------------------
+1/1 Testing: projectile_algorithms
+1/1 Test: projectile_algorithms
+Command: "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/build/projectile_tests.exe"
+Directory: D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/build
+"projectile_algorithms" start time: Sep 30 13:51 India Standard Time
+Output:
+----------------------------------------------------------
+algorithm tests passed
+<end of output>
+Test time =   0.71 sec
+----------------------------------------------------------
+Test Passed.
+"projectile_algorithms" end time: Sep 30 13:51 India Standard Time
+"projectile_algorithms" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Sep 30 13:51 India Standard Time
