@@ -888,7 +888,7 @@ The pipeline is executed every frame inside `main()`. Each stage is independentl
 
 ### Stage 13: Draw
 - **Function:** `_draw_tracks()` — draws bboxes, colour-coded by classification
-- Draws permanently-saved arcs (green) and extrapolated paths (red) from `saved_projectile_arcs` / `saved_projectile_predictions`
+- Draws accepted arcs (green) and extrapolated paths (red) from `saved_projectile_arcs` / `saved_projectile_predictions`; both expire after `PROJECTILE_ARC_DISPLAY_SECONDS`
 - HUD overlay: frame number, track count, detection count, MOG2 warmup warning
 - Alarm overlay: green border flash + banner
 
@@ -1146,7 +1146,7 @@ No command-line arguments. All configuration is in `config.py`.
 ### Resource Allocation
 - **MOG2 model:** Allocated once, lives for full duration. Significant memory for 500-frame history.
 - **`_Track._next_id`:** Global class variable; not reset unless `KalmanTracker.reset()` is called. IDs grow monotonically across restarts within one process.
-- **`saved_projectile_arcs/predictions`:** Accumulate permanently — never pruned by track death.
+- **`saved_projectile_arcs/predictions`:** Kept only for `PROJECTILE_ARC_DISPLAY_SECONDS`, then removed from the display.
 
 ---
 
@@ -1764,4 +1764,3 @@ Only pixels that changed in BOTH intervals survive. `gap=2` skips slow cloud dri
 ---
 
 *End of CODEBASE_ARCHITECTURE.md*
-

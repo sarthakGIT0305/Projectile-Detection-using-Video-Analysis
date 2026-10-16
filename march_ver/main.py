@@ -47,6 +47,7 @@ from config import (
     ENABLE_TRAIL, TRAIL_LENGTH,
     ARC_MIN_SPAN_RATIO, ARC_MAX_RESIDUAL, ARC_MIN_POINTS,
     EXTRAPOLATION_STOP_FROM_BOTTOM_PX,
+    PROJECTILE_ARC_DISPLAY_SECONDS,
     ENABLE_CLASSIFIER,
     CLASSIFIER_MIN_AGE, CLASSIFIER_MIN_DISPLACEMENT,
     CLASSIFIER_MIN_SPEED, CLASSIFIER_MAX_SPEED,
@@ -138,7 +139,7 @@ def _show_debug_masks(masks: dict):
             cv2.imshow(title, _resize_for_display(vis))
 
 
-def _wants_filter_layer_debug() -> bool:
+def _wants_filter_layer_debug() -> bool: 
     return any([
         DEBUG_SHOW_CONTOURS,
         DEBUG_SHOW_FILTER_AREA,
@@ -581,7 +582,7 @@ def _check_projectile_arc(trail_store, tracks, frame_width, frame_height):
 
         flagged.add(tid)
         
-        # Save a smooth fitted arc for drawing permanently
+        # Save a smooth fitted arc for drawing when the detection is accepted.
         x_min, x_max = xs.min(), xs.max()
         x_range = np.linspace(x_min, x_max, 100)
         y_range = np.polyval(coeffs, x_range)
@@ -661,8 +662,10 @@ def main():
 
     # Trajectory validators — one created per track ID on demand
     validators: dict = {}
-    saved_projectile_arcs = {}             # permanently saves arcs of detected projectiles
-    saved_projectile_predictions = {}      # permanently saves extrapolated landing paths
+    saved_projectile_arcs = {}
+    saved_projectile_predictions = {}
+    projectile_arc_expiry = {}
+    expired_projectile_ids = set()
 
     paused       = False
     frame_idx    = 0
@@ -847,11 +850,29 @@ def main():
             )
             if arc_ids:
                 n_projectiles = len(arc_ids)
-                # Permanently save these winning arcs
                 for tid, pts in new_arcs.items():
-                    saved_projectile_arcs[tid] = pts
+                    # Do not extend the timeout every frame while the same
+                    # track continues to satisfy the arc check.
+                    if (tid not in projectile_arc_expiry
+                            and tid not in expired_projectile_ids):
+                        saved_projectile_arcs[tid] = pts
+                        projectile_arc_expiry[tid] = frame_idx + int(
+                            PROJECTILE_ARC_DISPLAY_SECONDS * reader.fps
+                        )
                 for tid, pts in new_predictions.items():
-                    saved_projectile_predictions[tid] = pts
+                    if tid in projectile_arc_expiry:
+                        saved_projectile_predictions[tid] = pts
+
+        # Remove completed projectile paths after their display timeout.
+        expired_ids = {
+            tid for tid, expiry_frame in projectile_arc_expiry.items()
+            if frame_idx >= expiry_frame
+        }
+        for tid in expired_ids:
+            saved_projectile_arcs.pop(tid, None)
+            saved_projectile_predictions.pop(tid, None)
+            projectile_arc_expiry.pop(tid, None)
+            expired_projectile_ids.add(tid)
 
         # ── Alarm logic ───────────────────────────────────────────────
         if n_projectiles > 0:
@@ -866,8 +887,7 @@ def main():
             output = _draw_tracks(
                 display_frame, tracks, trail_store, validators,
                 classifier=classifier,
-                # Keep trail storage for arc detection, but hide temporary/live trail rendering.
-                show_trail=False
+                show_trail=TRAIL_ACTIVE
             )
             hud_tracks = len(tracks)
         else:

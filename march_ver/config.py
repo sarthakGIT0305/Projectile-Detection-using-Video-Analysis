@@ -8,8 +8,8 @@
 import cv2 
 # -----------------------------------------------------------------------------
 # VIDEO
-# -----------------------------------------------------------------------------
-VIDEO_PATH = r"D:\\Coding++\web_dev_and_projects\\folderAssets\\open_cv_assets\\20260408_02nw.mp4"
+# ----------------------------------------------------------------------------- 
+VIDEO_PATH = r"D:\\Coding++\web_dev_and_projects\\folderAssets\\open_cv_assets\\workings\\20260408_08.mp4"
 
 # -----------------------------------------------------------------------------
 # FEATURE FLAGS
@@ -32,9 +32,9 @@ ENABLE_DEBUG_VIEW   = True    # show intermediate mask windows while running
 TEMP_DISABLE_TRACKING = False  # not needed — use proper flags above
 
 # All advanced tracking disabled for detection-only mode
-ENABLE_VELOCITY_CHECK    = False
-ENABLE_SHAPE_DESCRIPTORS = False
-KALMAN_USE_GRAVITY       = False
+ENABLE_VELOCITY_CHECK    = True
+ENABLE_SHAPE_DESCRIPTORS = True
+KALMAN_USE_GRAVITY       = True
 
 # -----------------------------------------------------------------------------
 # PERFORMANCE
@@ -206,6 +206,7 @@ ARC_MIN_POINTS     = 8        # minimum observed trail points before checking
 # 0  => extend to very bottom edge
 # 80 => stop 80 px above bottom
 EXTRAPOLATION_STOP_FROM_BOTTOM_PX = 400
+PROJECTILE_ARC_DISPLAY_SECONDS = 4.0  # green/red paths remain visible this long
 
 # -----------------------------------------------------------------------------
 # DEBUG DISPLAY
