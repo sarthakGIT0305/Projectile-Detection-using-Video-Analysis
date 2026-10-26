@@ -13,6 +13,12 @@
 # =============================================================================
 
 import cv2
+import os
+import shutil
+import tempfile
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 
 class VideoReader:
@@ -20,13 +26,57 @@ class VideoReader:
 
     def __init__(self, path: str):
         self.path = path
-        self.cap  = cv2.VideoCapture(path)
+        self._temporary_path = None
+        capture_path = self._materialize_remote_video(path)
+        self.cap  = cv2.VideoCapture(capture_path)
 
         if not self.cap.isOpened():
+            if self._temporary_path is not None:
+                self._remove_temporary_video()
             raise RuntimeError(
                 f"VideoReader: cannot open '{path}'.\n"
-                "Check that the path is correct and the file is not corrupted."
+                "Check that the URL is reachable, the video is valid, and OpenCV can decode its format."
             )
+
+    @staticmethod
+    def _is_remote_url(path: str) -> bool:
+        return urlparse(path).scheme.lower() in {"http", "https"}
+
+    def _materialize_remote_video(self, path: str) -> str:
+        """Download a stored HTTP(S) video so OpenCV can seek through it."""
+        if not self._is_remote_url(path):
+            return path
+
+        suffix = os.path.splitext(urlparse(path).path)[1] or ".mp4"
+        temporary_file = tempfile.NamedTemporaryFile(
+            prefix="march_ver_", suffix=suffix, delete=False
+        )
+        temporary_path = temporary_file.name
+
+        try:
+            request = Request(path, headers={"User-Agent": "march_ver/1.0"})
+            with urlopen(request, timeout=30) as response, temporary_file:
+                shutil.copyfileobj(response, temporary_file, length=1024 * 1024)
+        except (HTTPError, URLError, TimeoutError, OSError) as exc:
+            temporary_file.close()
+            try:
+                os.remove(temporary_path)
+            except OSError:
+                pass
+            raise RuntimeError(
+                f"VideoReader: could not download '{path}': {exc}"
+            ) from exc
+
+        self._temporary_path = temporary_path
+        return temporary_path
+
+    def _remove_temporary_video(self):
+        if self._temporary_path is not None:
+            try:
+                os.remove(self._temporary_path)
+            except OSError:
+                pass
+            self._temporary_path = None
 
     # ------------------------------------------------------------------
     # Properties — read once from the capture object
@@ -79,6 +129,10 @@ class VideoReader:
 
     def release(self):
         self.cap.release()
+        self._remove_temporary_video()
+
+    def __del__(self):
+        self._remove_temporary_video()
 
     # ------------------------------------------------------------------
     # String representation for quick debugging

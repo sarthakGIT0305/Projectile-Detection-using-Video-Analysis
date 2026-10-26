@@ -9,8 +9,11 @@ import cv2
 # -----------------------------------------------------------------------------
 # VIDEO
 # ----------------------------------------------------------------------------- 
-VIDEO_PATH = r"D:\\Coding++\web_dev_and_projects\\folderAssets\\open_cv_assets\\workings\\20260408_08.mp4"
-
+# VIDEO_PATH may be a local file or a direct HTTP(S) URL to a stored video.
+# HTTP(S) videos are downloaded to a temporary file before OpenCV opens them.
+# Example: VIDEO_PATH = "https://your-server.example/videos/phone_clip.mp4"
+VIDEO_PATH = "http://172.22.5.33:6789/20260408_00.mp4"
+f
 # -----------------------------------------------------------------------------
 # FEATURE FLAGS
 # Each flag independently enables / disables one pipeline stage.
@@ -26,7 +29,9 @@ ENABLE_MORPH_CLEAN  = True    # morphological denoising of combined mask
 ENABLE_BLOB_FILTER  = True    # area / circularity / solidity blob filter
 ENABLE_TRAJECTORY   = False   # DISABLED — focus on raw detection first
 ENABLE_KALMAN       = 1 # Kalman tracking with IDs
-ENABLE_TRAIL        = 1   # trajectory trails
+ENABLE_TRAIL        = 1   # keep trail history for permanent arc detection
+SHOW_TRACK_TRAILS   = False # hide live trails; permanent projectile arcs remain visible
+SHOW_EXTRAPOLATION  = False # hide the red predicted continuation
 ENABLE_CLASSIFIER   = 0   # classification off for now
 ENABLE_DEBUG_VIEW   = True    # show intermediate mask windows while running
 TEMP_DISABLE_TRACKING = False  # not needed — use proper flags above

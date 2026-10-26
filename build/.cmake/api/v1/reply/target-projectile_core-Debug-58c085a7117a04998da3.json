@@ -38,9 +38,15 @@
 				"parent" : 0
 			},
 			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 13,
+				"parent" : 0
+			},
+			{
 				"command" : 2,
 				"file" : 0,
-				"line" : 15,
+				"line" : 18,
 				"parent" : 0
 			},
 			{
@@ -88,22 +94,22 @@
 					"fragment" : "-g -std=gnu++17"
 				},
 				{
-					"backtrace" : 3,
+					"backtrace" : 4,
 					"fragment" : "-Wall"
 				},
 				{
-					"backtrace" : 3,
+					"backtrace" : 4,
 					"fragment" : "-Wextra"
 				},
 				{
-					"backtrace" : 3,
+					"backtrace" : 4,
 					"fragment" : "-Wpedantic"
 				}
 			],
 			"includes" : 
 			[
 				{
-					"backtrace" : 4,
+					"backtrace" : 5,
 					"path" : "D:/Coding++/web_dev_and_projects/Projectile-Detection-using-Video-Analysis/cpp_live/include"
 				},
 				{
@@ -183,6 +189,10 @@
 		{
 			"backtrace" : 2,
 			"id" : "opencv_videoio::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 3,
+			"fragment" : "winhttp"
 		}
 	],
 	"linkLibraries" : 
@@ -206,6 +216,10 @@
 		{
 			"backtrace" : 2,
 			"id" : "opencv_videoio::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 3,
+			"fragment" : "winhttp"
 		}
 	],
 	"name" : "projectile_core",

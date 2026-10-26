@@ -44,7 +44,7 @@ from config import (
     ENABLE_ISOLATION_FILTER, ISOLATION_RADIUS, ISOLATION_MIN_CLUSTER,
     ENABLE_TRAJECTORY, TRAJECTORY_MIN_POINTS, TRAJECTORY_MAX_RESIDUAL,
     ENABLE_KALMAN, KALMAN_MAX_DISTANCE, KALMAN_MAX_MISSING,
-    ENABLE_TRAIL, TRAIL_LENGTH,
+    ENABLE_TRAIL, SHOW_TRACK_TRAILS, SHOW_EXTRAPOLATION, TRAIL_LENGTH,
     ARC_MIN_SPAN_RATIO, ARC_MAX_RESIDUAL, ARC_MIN_POINTS,
     EXTRAPOLATION_STOP_FROM_BOTTOM_PX,
     PROJECTILE_ARC_DISPLAY_SECONDS,
@@ -584,7 +584,9 @@ def _check_projectile_arc(trail_store, tracks, frame_width, frame_height):
         
         # Save a smooth fitted arc for drawing when the detection is accepted.
         x_min, x_max = xs.min(), xs.max()
-        x_range = np.linspace(x_min, x_max, 100)
+        direction = 1.0 if (pts[-1][0] - pts[0][0]) >= 0 else -1.0
+        x_range = (np.linspace(x_min, x_max, 100)
+               if direction > 0 else np.linspace(x_max, x_min, 100))
         y_range = np.polyval(coeffs, x_range)
         arcs[tid] = [(int(x), int(y)) for x, y in zip(x_range, y_range)]
 
@@ -855,10 +857,13 @@ def main():
                     # track continues to satisfy the arc check.
                     if (tid not in projectile_arc_expiry
                             and tid not in expired_projectile_ids):
-                        saved_projectile_arcs[tid] = pts
                         projectile_arc_expiry[tid] = frame_idx + int(
                             PROJECTILE_ARC_DISPLAY_SECONDS * reader.fps
                         )
+                    if tid in projectile_arc_expiry:
+                        # Keep the observed fit synchronized with its
+                        # continuation so the permanent path has no kink.
+                        saved_projectile_arcs[tid] = pts
                 for tid, pts in new_predictions.items():
                     if tid in projectile_arc_expiry:
                         saved_projectile_predictions[tid] = pts
@@ -887,7 +892,7 @@ def main():
             output = _draw_tracks(
                 display_frame, tracks, trail_store, validators,
                 classifier=classifier,
-                show_trail=TRAIL_ACTIVE
+                show_trail=TRAIL_ACTIVE and SHOW_TRACK_TRAILS
             )
             hud_tracks = len(tracks)
         else:
@@ -898,22 +903,36 @@ def main():
         for tid, arc_pts in saved_projectile_arcs.items():
             color = COLOR_PROJECTILE_ARC
             h_img, w_img = output.shape[:2]
-            if len(arc_pts) > 1:
-                for i in range(1, len(arc_pts)):
-                    p1 = arc_pts[i - 1]
-                    p2 = arc_pts[i]
-                    if (0 <= p1[0] < w_img and 0 <= p1[1] < h_img and
-                            0 <= p2[0] < w_img and 0 <= p2[1] < h_img):
-                        cv2.line(output, p1, p2, color, 5)
-
             predicted_pts = saved_projectile_predictions.get(tid, [])
+            full_path = list(arc_pts)
+            if predicted_pts:
+                if full_path and full_path[-1] != predicted_pts[0]:
+                    full_path.append(predicted_pts[0])
+                full_path.extend(predicted_pts[1:] if full_path else predicted_pts)
+
+            if len(full_path) > 1:
+                cv2.polylines(
+                    output,
+                    [np.asarray(full_path, dtype=np.int32)],
+                    False,
+                    color,
+                    5,
+                    cv2.LINE_AA,
+                )
+
             if len(predicted_pts) > 1:
-                for i in range(1, len(predicted_pts)):
-                    p1 = predicted_pts[i - 1]
-                    p2 = predicted_pts[i]
-                    if (0 <= p1[0] < w_img and 0 <= p1[1] < h_img and
-                            0 <= p2[0] < w_img and 0 <= p2[1] < h_img):
-                        cv2.line(output, p1, p2, COLOR_EXTRAPOLATION, 5)
+                predicted_color = (
+                    COLOR_EXTRAPOLATION if SHOW_EXTRAPOLATION else color
+                )
+                if SHOW_EXTRAPOLATION:
+                    cv2.polylines(
+                        output,
+                        [np.asarray(predicted_pts, dtype=np.int32)],
+                        False,
+                        predicted_color,
+                        5,
+                        cv2.LINE_AA,
+                    )
 
         output = _draw_hud(
             output, frame_idx,

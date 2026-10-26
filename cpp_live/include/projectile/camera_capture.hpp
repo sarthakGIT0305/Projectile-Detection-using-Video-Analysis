@@ -13,7 +13,7 @@ public:
 	~CameraCapture();
 	void start(); void stop(); bool is_open() const { return opened_; } std::uint64_t captured() const { return captured_; }
 private:
-	void run(); int index_; int width_; int height_; double fps_; std::string video_path_; LatestFrameBuffer& buffer_; cv::VideoCapture capture_; std::thread worker_; std::atomic_bool stopping_{false}; std::atomic_bool opened_{false}; std::atomic_uint64_t captured_{0};
+	void run(); int index_; int width_; int height_; double fps_; std::string video_path_; std::string temporary_video_path_; LatestFrameBuffer& buffer_; cv::VideoCapture capture_; std::thread worker_; std::atomic_bool stopping_{false}; std::atomic_bool opened_{false}; std::atomic_uint64_t captured_{0};
 };
 
 }

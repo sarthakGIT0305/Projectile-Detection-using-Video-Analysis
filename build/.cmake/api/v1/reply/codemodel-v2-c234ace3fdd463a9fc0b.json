@@ -619,21 +619,21 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "projectile_core::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-projectile_core-Debug-ef962382dc4c5ece0e55.json",
+					"jsonFile" : "target-projectile_core-Debug-58c085a7117a04998da3.json",
 					"name" : "projectile_core",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 0,
 					"id" : "projectile_live::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-projectile_live-Debug-add9b3b677ca0f6eda22.json",
+					"jsonFile" : "target-projectile_live-Debug-a339a12c17b74a0ec522.json",
 					"name" : "projectile_live",
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 0,
 					"id" : "projectile_tests::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-projectile_tests-Debug-29619305a5ea4305783e.json",
+					"jsonFile" : "target-projectile_tests-Debug-6f591461612a39c1fdcf.json",
 					"name" : "projectile_tests",
 					"projectIndex" : 0
 				}
